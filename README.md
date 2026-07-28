@@ -9,11 +9,20 @@ O diferencial do projeto é sua interface física, conectada à Raspberry Pi, qu
 
 A Raspberry Pi permite executar toda a lógica do jogo, gerenciar a interface física, reproduzir áudio, controlar múltiplos periféricos simultaneamente e oferecer uma arquitetura mais flexível para expansão do projeto.
 
----
-### Instalação
-... 
+## Cronograma
 
----
-### Desenvolvedores:
+| Semana | Entregas |
+| ------ | ---------------------------------------------------------------------------------------------------- |
+| 1      | Idealização do projeto, requisitos funcionais e não funcionais.                                      |
+| 2      | Interface básica, implementação de inputs por botões e joysticks, e implementação de alguns módulos. |
+| 3      | Implementação do restante dos módulos e relatório final.                                             |
+| 4      | Correção de bugs e implementação de features adicionais.                                             |
+
+## Requisitos
+### Requisitos funcionais
+
+### Requisitos não-funcionais
+
+## Desenvolvedores:
 - Enzo Goro - 13553825
 - Paulo Yamaguti - 12554612

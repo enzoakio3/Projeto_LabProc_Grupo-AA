@@ -18,11 +18,6 @@ A Raspberry Pi permite executar toda a lógica do jogo, gerenciar a interface f�
 | 3      | Implementação do restante dos módulos e relatório final.                                             |
 | 4      | Correção de bugs e implementação de features adicionais.                                             |
 
-## Requisitos
-### Requisitos funcionais
-
-### Requisitos não-funcionais
-
 ## Desenvolvedores:
 - Enzo Goro - 13553825
 - Paulo Yamaguti - 12554612

@@ -31,7 +31,7 @@ A Raspberry Pi permite executar toda a lógica do jogo, gerenciar a interface f�
 
 ---
 
-### Arquitetura de Hardware
+### Arquitetura de Software
 
 A arquitetura proposta é baseada em um **Raspberry Pi 3** como unidade central de processamento, responsável por executar toda a lógica do jogo, controlar o cronômetro, validar as ações do jogador e gerenciar os periféricos conectados. Utilizaremos o pygame que é uma biblioteca gratuita usada para criar jogos de forma mais simples e que pode ser suportada pela Raspberry Pi 3.
 

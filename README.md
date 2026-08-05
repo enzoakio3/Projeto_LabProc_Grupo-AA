@@ -84,8 +84,11 @@ A arquitetura centralizada foi escolhida por simplificar o desenvolvimento do pr
 | 3      | Implementação do restante dos módulos e relatório final.                                             |
 | 4      | Correção de bugs e implementação de features adicionais.                                             |
 
-## Link relatório com motivação:
+### Link relatório com motivação:
 https://docs.google.com/document/d/11jxg66rxFvP1fYSW8-Ed31L4WivpC0GDYvS7KKQRi8A/edit?tab=t.0
+
+### Link do jogo que serviu como referência para a motivação do projeto:
+https://store.steampowered.com/app/341800/Keep_Talking_and_Nobody_Explodes/
 
 ## Desenvolvedores:
 - Enzo Goro - 13553825

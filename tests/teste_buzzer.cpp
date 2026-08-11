@@ -4,9 +4,48 @@
 
 #define BUZZER_PIN 4
 
+void stopBuzzer()
+{
+    softToneWrite(BUZZER_PIN, 0);
+}
+
+void successSound()
+{
+    printf("2000 Hz\n");
+
+    softToneWrite(BUZZER_PIN, 2000);
+    delay(1000);
+
+    stopBuzzer();
+}
+
+void errorSound()
+{
+    printf("700 Hz\n");
+
+    softToneWrite(BUZZER_PIN, 700);
+    delay(1000);
+
+    stopBuzzer();
+}
+
+void alertSound()
+{
+    printf("1500 Hz\n");
+
+    for (int i = 0; i < 3; i++)
+    {
+        softToneWrite(BUZZER_PIN, 1500);
+        delay(300);
+
+        stopBuzzer();
+        delay(150);
+    }
+}
+
 int main()
 {
-    printf("Iniciando buzzer...\n");
+    printf("Iniciando teste do buzzer...\n");
 
     if (wiringPiSetupGpio() == -1)
     {
@@ -22,21 +61,22 @@ int main()
         return 1;
     }
 
-    printf("1000 Hz\n");
-    softToneWrite(BUZZER_PIN, 1000);
-    delay(500);
+    printf("Som de sucesso...\n");
+    successSound();
 
-    printf("1500 Hz\n");
-    softToneWrite(BUZZER_PIN, 1500);
-    delay(500);
+    delay(1000);
 
-    printf("2000 Hz\n");
-    softToneWrite(BUZZER_PIN, 2000);
-    delay(500);
+    printf("Som de erro...\n");
+    errorSound();
 
-    softToneWrite(BUZZER_PIN, 0);
+    delay(1000);
 
-    printf("Fim.\n");
+    printf("Som de alerta...\n");
+    alertSound();
+
+    stopBuzzer();
+
+    printf("Teste concluido.\n");
 
     return 0;
 }

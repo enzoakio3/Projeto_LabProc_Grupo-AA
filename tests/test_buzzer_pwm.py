@@ -24,7 +24,7 @@ pwm = GPIO.PWM(
 )
 
 # Duty cycle 50%
-pwm.start(50)
+pwm.start(80)
 
 
 try:

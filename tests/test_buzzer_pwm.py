@@ -17,28 +17,23 @@ GPIO.setup(BUZZER_PIN, GPIO.OUT)
 # PWM
 # =====================================================
 
-# Começa em 1000 Hz
 pwm = GPIO.PWM(
     BUZZER_PIN,
-    1000
+    2000
 )
 
-# Duty cycle 50%
+# Começa com duty cycle alto
 pwm.start(80)
 
 
 try:
 
-    # Testa várias frequências para descobrir
-    # em qual faixa o buzzer responde melhor.
-
     frequencies = [
-        200,
-        400,
-        700,
         1000,
         1500,
+        1800,
         2000,
+        2200,
         2500,
         3000
     ]
@@ -53,15 +48,18 @@ try:
             frequency
         )
 
-        # deixa tocar por 1 segundo
-        time.sleep(1)
+        pwm.ChangeDutyCycle(
+            80
+        )
+
+        time.sleep(1.2)
 
         # pausa
-        pwm.ChangeDutyCycle(0)
-        time.sleep(0.3)
+        pwm.ChangeDutyCycle(
+            0
+        )
 
-        # volta a gerar onda quadrada
-        pwm.ChangeDutyCycle(50)
+        time.sleep(0.4)
 
 
 finally:

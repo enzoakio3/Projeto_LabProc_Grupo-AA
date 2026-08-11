@@ -1,2 +1,16 @@
 # Ambiente virtual
 .venv/
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Arquivos do VS Code
+.vscode/
+
+# Arquivos do PyCharm
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db

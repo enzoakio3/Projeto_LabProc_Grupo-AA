@@ -1,15 +1,13 @@
 import pygame
 import random
-import time
+
 
 # =====================================================
-# TENTA CARREGAR O HARDWARE DA RASPBERRY
+# TENTA IMPORTAR O GPIO DA RASPBERRY
 # =====================================================
 
 try:
-    from gpiozero import Button, TonalBuzzer
-    from gpiozero.tones import Tone
-
+    import RPi.GPIO as GPIO
     RASPBERRY_AVAILABLE = True
 
 except ImportError:
@@ -31,6 +29,7 @@ class SequenceModule:
         # input     = esperando resposta
         # error     = resposta errada
         # completed = módulo concluído
+
         self.state = "waiting"
 
         # =====================================================
@@ -59,10 +58,10 @@ class SequenceModule:
         }
 
         # =====================================================
-        # GPIO DOS BOTÕES DA PLACA
+        # GPIO DOS BOTÕES
         # =====================================================
         #
-        # De acordo com a placa:
+        # Placa:
         #
         # Vermelho -> GPIO16
         # Azul     -> GPIO20
@@ -81,26 +80,18 @@ class SequenceModule:
         # =====================================================
         # BUZZER PASSIVO
         # =====================================================
-        #
-        # Freenove Projects Board:
-        #
-        # Passive Buzzer -> GPIO4
-        #
-        # =====================================================
 
         self.buzzer_pin = 4
 
-        # Frequência de cada cor.
-        #
-        # O buzzer passivo da placa tem melhor resposta
-        # próximo de 2 kHz, então usamos frequências
-        # relativamente altas.
+        # Frequências usadas para diferenciar as cores.
+        # Mantemos todas relativamente próximas de 2 kHz,
+        # onde o buzzer da placa respondeu melhor.
 
         self.frequencies = {
-            "vermelho": 1000,
-            "azul": 1300,
-            "verde": 1600,
-            "amarelo": 2000
+            "vermelho": 1700,
+            "azul": 1900,
+            "verde": 2100,
+            "amarelo": 2300
         }
 
         # =====================================================
@@ -109,9 +100,17 @@ class SequenceModule:
 
         self.hardware_enabled = False
 
-        self.buttons_gpio = {}
+        self.buzzer_pwm = None
 
-        self.buzzer = None
+        # Guarda estado anterior dos botões para detectar
+        # apenas o momento em que foram pressionados.
+
+        self.previous_button_state = {
+            "vermelho": GPIO.HIGH if RASPBERRY_AVAILABLE else 1,
+            "azul": GPIO.HIGH if RASPBERRY_AVAILABLE else 1,
+            "verde": GPIO.HIGH if RASPBERRY_AVAILABLE else 1,
+            "amarelo": GPIO.HIGH if RASPBERRY_AVAILABLE else 1
+        }
 
         self.setup_hardware()
 
@@ -119,12 +118,13 @@ class SequenceModule:
         # TABELA DE SEQUÊNCIAS
         # =====================================================
         #
-        # ESQUERDA = sequência mostrada/tocada
+        # ESQUERDA:
+        # sequência que o jogador vê/ouve.
         #
-        # DIREITA = sequência que o especialista
-        #           manda o jogador apertar
+        # DIREITA:
+        # sequência que o especialista encontra no manual
+        # e manda o jogador apertar.
         #
-        # Essa mesma tabela irá para o manual.
         # =====================================================
 
         self.sequence_table = {
@@ -249,19 +249,8 @@ class SequenceModule:
 
         self.player_input = []
 
-        # Fila utilizada pelos botões físicos.
-        #
-        # O gpiozero detecta o botão em outra thread.
-        # Colocamos a cor nessa fila e o update()
-        # processa normalmente.
-
-        self.hardware_input_queue = []
-
-        # Evita aceitar entrada enquanto não é hora
-        self.accept_hardware_input = False
-
         # =====================================================
-        # EXIBIÇÃO DA SEQUÊNCIA
+        # CONTROLE DA EXIBIÇÃO
         # =====================================================
 
         self.show_index = 0
@@ -270,29 +259,82 @@ class SequenceModule:
 
         self.last_change_time = 0
 
-        # Tempo que cada cor fica ligada
+        # Tempo que a cor fica acesa/tocando
         self.light_duration = 550
 
-        # Intervalo entre cores
+        # Pausa entre as cores
         self.pause_duration = 300
 
         self.showing_light = False
 
         # =====================================================
-        # ERRO
+        # SOM DE BOTÃO
         # =====================================================
 
-        # Não usaremos mais error.wav neste módulo.
-        # O erro também será produzido pelo buzzer passivo.
+        # Quando o jogador aperta um botão físico,
+        # tocamos a nota por um pequeno período.
+
+        self.input_tone_active = False
+
+        self.input_tone_start = 0
+
+        self.input_tone_duration = 180
+
+        # =====================================================
+        # SOM DE ERRO
+        # =====================================================
 
         self.error_start_time = 0
 
-        # Duração total do aviso
-        self.error_duration = 900
+        # O erro dura cerca de 1 segundo
+        self.error_duration = 1000
 
-        # Controle das etapas do som de erro
-        self.error_tone_stage = 0
+        self.error_stage = 0
+
         self.error_last_change = 0
+
+        # =====================================================
+        # ÁUDIO PARA PC
+        # =====================================================
+
+        # Se não estivermos na Raspberry,
+        # continuamos usando os WAVs.
+
+        self.pc_sounds = {}
+
+        self.pc_error_sound = None
+
+        if not self.hardware_enabled:
+
+            try:
+
+                self.pc_sounds = {
+                    "vermelho": pygame.mixer.Sound(
+                        "assets/sounds/red.wav"
+                    ),
+
+                    "azul": pygame.mixer.Sound(
+                        "assets/sounds/blue.wav"
+                    ),
+
+                    "verde": pygame.mixer.Sound(
+                        "assets/sounds/green.wav"
+                    ),
+
+                    "amarelo": pygame.mixer.Sound(
+                        "assets/sounds/yellow.wav"
+                    )
+                }
+
+                self.pc_error_sound = pygame.mixer.Sound(
+                    "assets/sounds/error.wav"
+                )
+
+            except pygame.error:
+
+                print(
+                    "Não foi possível carregar os sons do PC."
+                )
 
         # =====================================================
         # FONTES
@@ -325,7 +367,7 @@ class SequenceModule:
         )
 
         # =====================================================
-        # BOTÕES VISUAIS
+        # BOTÕES NA TELA
         # =====================================================
 
         self.color_buttons = {
@@ -369,11 +411,11 @@ class SequenceModule:
         if not RASPBERRY_AVAILABLE:
 
             print(
-                "GPIOZero não encontrado."
+                "RPi.GPIO não disponível."
             )
 
             print(
-                "Executando módulo em modo PC."
+                "Executando sequência em modo PC."
             )
 
             return
@@ -381,11 +423,15 @@ class SequenceModule:
         try:
 
             # ---------------------------------------------
-            # BUZZER PASSIVO
+            # MODO BCM
             # ---------------------------------------------
 
-            self.buzzer = TonalBuzzer(
-                self.buzzer_pin
+            GPIO.setmode(
+                GPIO.BCM
+            )
+
+            GPIO.setwarnings(
+                False
             )
 
             # ---------------------------------------------
@@ -396,34 +442,36 @@ class SequenceModule:
                 self.button_pins.items()
             ):
 
-                button = Button(
+                GPIO.setup(
                     pin,
-                    pull_up=True,
-                    bounce_time=0.08
+                    GPIO.IN,
+                    pull_up_down=GPIO.PUD_UP
                 )
 
-                # Precisamos capturar a cor correta
-                # dentro da função lambda.
+            # ---------------------------------------------
+            # BUZZER
+            # ---------------------------------------------
 
-                button.when_pressed = (
-                    lambda color=color:
-                    self.hardware_button_pressed(
-                        color
-                    )
-                )
+            GPIO.setup(
+                self.buzzer_pin,
+                GPIO.OUT
+            )
 
-                self.buttons_gpio[
-                    color
-                ] = button
+            # Cria PWM inicialmente em 2000 Hz
+            self.buzzer_pwm = GPIO.PWM(
+                self.buzzer_pin,
+                2000
+            )
+
+            # Começa desligado
+            self.buzzer_pwm.start(
+                0
+            )
 
             self.hardware_enabled = True
 
             print(
-                "Hardware da Raspberry inicializado."
-            )
-
-            print(
-                "Botões:"
+                "Hardware da sequência inicializado!"
             )
 
             print(
@@ -443,13 +491,13 @@ class SequenceModule:
             )
 
             print(
-                "Passive Buzzer -> GPIO4"
+                "Buzzer passivo -> GPIO4"
             )
 
         except Exception as error:
 
             print(
-                "Não foi possível inicializar GPIO:"
+                "Erro ao inicializar hardware:"
             )
 
             print(
@@ -460,29 +508,7 @@ class SequenceModule:
 
 
     # =====================================================
-    # BOTÃO FÍSICO PRESSIONADO
-    # =====================================================
-
-    def hardware_button_pressed(
-        self,
-        color
-    ):
-
-        # Só aceita os botões quando estamos
-        # esperando a resposta.
-
-        if (
-            self.state == "input"
-            and self.accept_hardware_input
-        ):
-
-            self.hardware_input_queue.append(
-                color
-            )
-
-
-    # =====================================================
-    # GERAR SEQUÊNCIA
+    # GERAR DESAFIO
     # =====================================================
 
     def generate_sequence(self):
@@ -501,9 +527,7 @@ class SequenceModule:
             ]
         )
 
-        # DEBUG
-        #
-        # Deixar por enquanto para testar.
+        # DEBUG PARA DESENVOLVIMENTO
 
         print(
             "Sequência tocada:",
@@ -517,56 +541,144 @@ class SequenceModule:
 
 
     # =====================================================
-    # TOCAR COR NO BUZZER
+    # TOCAR COR
     # =====================================================
 
-    def play_color_tone(
+    def play_color_sound(
         self,
         color
     ):
 
-        if not self.hardware_enabled:
+        # =================================================
+        # RASPBERRY
+        # =================================================
 
-            return
+        if self.hardware_enabled:
 
-        frequency = self.frequencies[
-            color
-        ]
-
-        try:
-
-            self.buzzer.play(
-                Tone(
-                    frequency
-                )
-            )
-
-        except Exception as error:
-
-            print(
-                "Erro ao tocar buzzer:",
-                error
-            )
-
-
-    # =====================================================
-    # PARAR BUZZER
-    # =====================================================
-
-    def stop_buzzer(self):
-
-        if (
-            self.hardware_enabled
-            and self.buzzer is not None
-        ):
+            frequency = self.frequencies[
+                color
+            ]
 
             try:
 
-                self.buzzer.stop()
+                self.buzzer_pwm.ChangeFrequency(
+                    frequency
+                )
+
+                # 50% = onda quadrada
+                self.buzzer_pwm.ChangeDutyCycle(
+                    50
+                )
+
+            except Exception as error:
+
+                print(
+                    "Erro ao tocar buzzer:",
+                    error
+                )
+
+        # =================================================
+        # PC
+        # =================================================
+
+        else:
+
+            if color in self.pc_sounds:
+
+                pygame.mixer.stop()
+
+                self.pc_sounds[
+                    color
+                ].play()
+
+
+    # =====================================================
+    # PARAR SOM
+    # =====================================================
+
+    def stop_sound(self):
+
+        if self.hardware_enabled:
+
+            try:
+
+                self.buzzer_pwm.ChangeDutyCycle(
+                    0
+                )
 
             except Exception:
 
                 pass
+
+        else:
+
+            pygame.mixer.stop()
+
+
+    # =====================================================
+    # LER BOTÕES FÍSICOS
+    # =====================================================
+
+    def read_hardware_buttons(self):
+
+        if not self.hardware_enabled:
+
+            return None
+
+        # Só aceita botão durante a resposta
+        if self.state != "input":
+
+            # Mesmo quando não aceitamos entrada,
+            # atualizamos o estado anterior para evitar
+            # detectar um botão que ficou segurado.
+
+            for color, pin in (
+                self.button_pins.items()
+            ):
+
+                self.previous_button_state[
+                    color
+                ] = GPIO.input(
+                    pin
+                )
+
+            return None
+
+        for color, pin in (
+            self.button_pins.items()
+        ):
+
+            current_state = GPIO.input(
+                pin
+            )
+
+            previous_state = (
+                self.previous_button_state[
+                    color
+                ]
+            )
+
+            # Botões são active LOW.
+            #
+            # HIGH -> LOW significa que acabou
+            # de ser pressionado.
+
+            if (
+                previous_state == GPIO.HIGH
+                and current_state == GPIO.LOW
+            ):
+
+                self.previous_button_state[
+                    color
+                ] = current_state
+
+                return color
+
+            self.previous_button_state[
+                color
+            ] = current_state
+
+        return None
 
 
     # =====================================================
@@ -575,19 +687,17 @@ class SequenceModule:
 
     def start_sequence(self):
 
-        self.stop_buzzer()
+        self.stop_sound()
 
         self.player_input = []
-
-        self.hardware_input_queue = []
-
-        self.accept_hardware_input = False
 
         self.show_index = 0
 
         self.highlighted_color = None
 
         self.showing_light = False
+
+        self.input_tone_active = False
 
         self.last_change_time = (
             pygame.time.get_ticks()
@@ -597,7 +707,7 @@ class SequenceModule:
 
 
     # =====================================================
-    # PROCESSAR UMA COR DIGITADA
+    # PROCESSAR BOTÃO
     # =====================================================
 
     def process_color_input(
@@ -610,21 +720,29 @@ class SequenceModule:
             return
 
         # ---------------------------------------------
-        # TOCA O SOM DO BOTÃO PRESSIONADO
+        # TOCA O TOM DO BOTÃO
         # ---------------------------------------------
 
-        self.stop_buzzer()
+        self.stop_sound()
 
-        self.play_color_tone(
+        self.play_color_sound(
             selected_color
         )
 
-        # O som é interrompido no próximo update
-        # depois de um pequeno período.
+        self.input_tone_active = True
 
-        self.button_tone_start = (
+        self.input_tone_start = (
             pygame.time.get_ticks()
         )
+
+        # Também acende botão na tela
+        self.highlighted_color = (
+            selected_color
+        )
+
+        # ---------------------------------------------
+        # GUARDA RESPOSTA
+        # ---------------------------------------------
 
         self.player_input.append(
             selected_color
@@ -661,17 +779,163 @@ class SequenceModule:
             )
         ):
 
-            self.stop_buzzer()
+            self.stop_sound()
+
+            self.highlighted_color = None
 
             self.concluido = True
 
             self.state = "completed"
 
-            self.accept_hardware_input = False
-
             print(
                 "Sequência concluída!"
             )
+
+
+    # =====================================================
+    # ERRO
+    # =====================================================
+
+    def trigger_error(self):
+
+        self.stop_sound()
+
+        self.highlighted_color = None
+
+        self.state = "error"
+
+        self.error_start_time = (
+            pygame.time.get_ticks()
+        )
+
+        self.error_last_change = (
+            self.error_start_time
+        )
+
+        self.error_stage = 0
+
+        # ---------------------------------------------
+        # RASPBERRY
+        # ---------------------------------------------
+
+        if self.hardware_enabled:
+
+            self.buzzer_pwm.ChangeFrequency(
+                2200
+            )
+
+            self.buzzer_pwm.ChangeDutyCycle(
+                50
+            )
+
+        # ---------------------------------------------
+        # PC
+        # ---------------------------------------------
+
+        else:
+
+            if self.pc_error_sound is not None:
+
+                pygame.mixer.stop()
+
+                self.pc_error_sound.play()
+
+        print(
+            "Sequência incorreta!"
+        )
+
+
+    # =====================================================
+    # ATUALIZAR SOM DE ERRO
+    # =====================================================
+
+    def update_error_sound(
+        self,
+        current_time
+    ):
+
+        elapsed_total = (
+            current_time
+            - self.error_start_time
+        )
+
+        elapsed_stage = (
+            current_time
+            - self.error_last_change
+        )
+
+        # Na Raspberry fazemos uma sequência descendente
+        # para diferenciar bem o erro das notas normais.
+
+        if self.hardware_enabled:
+
+            # -----------------------------------------
+            # ETAPA 1
+            # -----------------------------------------
+
+            if (
+                self.error_stage == 0
+                and elapsed_stage >= 250
+            ):
+
+                self.buzzer_pwm.ChangeFrequency(
+                    1700
+                )
+
+                self.error_stage = 1
+
+                self.error_last_change = (
+                    current_time
+                )
+
+            # -----------------------------------------
+            # ETAPA 2
+            # -----------------------------------------
+
+            elif (
+                self.error_stage == 1
+                and elapsed_stage >= 250
+            ):
+
+                self.buzzer_pwm.ChangeFrequency(
+                    1100
+                )
+
+                self.error_stage = 2
+
+                self.error_last_change = (
+                    current_time
+                )
+
+            # -----------------------------------------
+            # ETAPA 3
+            # -----------------------------------------
+
+            elif (
+                self.error_stage == 2
+                and elapsed_stage >= 250
+            ):
+
+                self.buzzer_pwm.ChangeFrequency(
+                    700
+                )
+
+                self.error_stage = 3
+
+                self.error_last_change = (
+                    current_time
+                )
+
+        # =================================================
+        # TERMINOU O ERRO
+        # =================================================
+
+        if elapsed_total >= self.error_duration:
+
+            self.stop_sound()
+
+            # Repete a MESMA sequência
+            self.start_sequence()
 
 
     # =====================================================
@@ -719,7 +983,7 @@ class SequenceModule:
             )
 
             # ---------------------------------------------
-            # ACENDER / TOCAR PRÓXIMA COR
+            # COMEÇA PRÓXIMA COR
             # ---------------------------------------------
 
             if not self.showing_light:
@@ -742,9 +1006,9 @@ class SequenceModule:
                             color
                         )
 
-                        self.stop_buzzer()
+                        self.stop_sound()
 
-                        self.play_color_tone(
+                        self.play_color_sound(
                             color
                         )
 
@@ -756,20 +1020,17 @@ class SequenceModule:
 
                     else:
 
-                        self.stop_buzzer()
+                        # Sequência terminou
+                        self.stop_sound()
 
                         self.highlighted_color = None
 
                         self.player_input = []
 
-                        self.hardware_input_queue = []
-
-                        self.accept_hardware_input = True
-
                         self.state = "input"
 
             # ---------------------------------------------
-            # APAGAR / PARAR COR
+            # TERMINA COR ATUAL
             # ---------------------------------------------
 
             else:
@@ -779,7 +1040,7 @@ class SequenceModule:
                     >= self.light_duration
                 ):
 
-                    self.stop_buzzer()
+                    self.stop_sound()
 
                     self.highlighted_color = None
 
@@ -800,22 +1061,21 @@ class SequenceModule:
             selected_color = None
 
             # ---------------------------------------------
-            # BOTÃO FÍSICO
+            # PRIMEIRO: BOTÕES FÍSICOS
             # ---------------------------------------------
 
-            if self.hardware_input_queue:
-
-                selected_color = (
-                    self.hardware_input_queue.pop(
-                        0
-                    )
-                )
+            selected_color = (
+                self.read_hardware_buttons()
+            )
 
             # ---------------------------------------------
-            # TECLADO DO PC
+            # TECLADO
             # ---------------------------------------------
 
-            elif event.type == pygame.KEYDOWN:
+            if (
+                selected_color is None
+                and event.type == pygame.KEYDOWN
+            ):
 
                 key_map = {
 
@@ -844,8 +1104,9 @@ class SequenceModule:
             # MOUSE
             # ---------------------------------------------
 
-            elif (
-                event.type
+            if (
+                selected_color is None
+                and event.type
                 == pygame.MOUSEBUTTONDOWN
             ):
 
@@ -861,11 +1122,37 @@ class SequenceModule:
 
                         break
 
+            # ---------------------------------------------
+            # PROCESSA
+            # ---------------------------------------------
+
             if selected_color is not None:
 
                 self.process_color_input(
                     selected_color
                 )
+
+            # ---------------------------------------------
+            # PARA SOM DO BOTÃO
+            # ---------------------------------------------
+
+            if self.input_tone_active:
+
+                elapsed = (
+                    current_time
+                    - self.input_tone_start
+                )
+
+                if (
+                    elapsed
+                    >= self.input_tone_duration
+                ):
+
+                    self.stop_sound()
+
+                    self.highlighted_color = None
+
+                    self.input_tone_active = False
 
         # =================================================
         # ERRO
@@ -876,109 +1163,6 @@ class SequenceModule:
             self.update_error_sound(
                 current_time
             )
-
-
-    # =====================================================
-    # ERRO
-    # =====================================================
-
-    def trigger_error(self):
-
-        self.accept_hardware_input = False
-
-        self.hardware_input_queue = []
-
-        self.stop_buzzer()
-
-        self.state = "error"
-
-        self.error_start_time = (
-            pygame.time.get_ticks()
-        )
-
-        self.error_last_change = (
-            self.error_start_time
-        )
-
-        self.error_tone_stage = 0
-
-        # Primeiro tom de erro
-        if self.hardware_enabled:
-
-            self.buzzer.play(
-                Tone(700)
-            )
-
-        print(
-            "Sequência incorreta!"
-        )
-
-
-    # =====================================================
-    # SOM DE ERRO
-    # =====================================================
-
-    def update_error_sound(
-        self,
-        current_time
-    ):
-
-        total_elapsed = (
-            current_time
-            - self.error_start_time
-        )
-
-        stage_elapsed = (
-            current_time
-            - self.error_last_change
-        )
-
-        # Som de erro:
-        #
-        # 700 Hz
-        # 400 Hz
-        # 200 Hz
-
-        if (
-            self.error_tone_stage == 0
-            and stage_elapsed >= 250
-        ):
-
-            if self.hardware_enabled:
-
-                self.buzzer.play(
-                    Tone(400)
-                )
-
-            self.error_tone_stage = 1
-
-            self.error_last_change = (
-                current_time
-            )
-
-        elif (
-            self.error_tone_stage == 1
-            and stage_elapsed >= 250
-        ):
-
-            if self.hardware_enabled:
-
-                self.buzzer.play(
-                    Tone(200)
-                )
-
-            self.error_tone_stage = 2
-
-            self.error_last_change = (
-                current_time
-            )
-
-        if total_elapsed >= self.error_duration:
-
-            self.stop_buzzer()
-
-            # Repete a MESMA sequência
-            self.start_sequence()
 
 
     # =====================================================
@@ -1068,7 +1252,7 @@ class SequenceModule:
         )
 
         # =================================================
-        # BOTÕES VISUAIS
+        # BOTÕES
         # =================================================
 
         for color_name in self.color_names:
@@ -1143,7 +1327,7 @@ class SequenceModule:
             )
 
         # =================================================
-        # ESTADO
+        # TEXTO DE ESTADO
         # =================================================
 
         if self.state == "showing":
@@ -1163,7 +1347,7 @@ class SequenceModule:
             else:
 
                 info = (
-                    "PC: teclas 1, 2, 3 e 4"
+                    "Use 1, 2, 3, 4 ou o mouse"
                 )
 
         elif self.state == "error":
@@ -1206,19 +1390,16 @@ class SequenceModule:
 
     def reset(self):
 
-        self.stop_buzzer()
+        self.stop_sound()
 
         self.concluido = False
 
         self.state = "waiting"
 
+        # Sorteia novo desafio
         self.generate_sequence()
 
         self.player_input = []
-
-        self.hardware_input_queue = []
-
-        self.accept_hardware_input = False
 
         self.show_index = 0
 
@@ -1226,23 +1407,34 @@ class SequenceModule:
 
         self.showing_light = False
 
+        self.input_tone_active = False
+
         self.error_start_time = 0
 
 
     # =====================================================
-    # FECHAR GPIO
+    # LIMPAR GPIO
     # =====================================================
 
     def cleanup(self):
 
-        self.stop_buzzer()
+        self.stop_sound()
 
-        if self.buzzer is not None:
+        if self.hardware_enabled:
 
-            self.buzzer.close()
+            try:
 
-        for button in (
-            self.buttons_gpio.values()
-        ):
+                if self.buzzer_pwm is not None:
 
-            button.close()
+                    self.buzzer_pwm.stop()
+
+                GPIO.output(
+                    self.buzzer_pin,
+                    GPIO.LOW
+                )
+
+                GPIO.cleanup()
+
+            except Exception:
+
+                pass

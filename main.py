@@ -3,11 +3,11 @@ from sys import exit
 
 # from modules.sequence import SequenceModule
 from modules.sequence_rasp import SequenceModule
-# from modules.password import PasswordModule
-from modules.password_rasp import PasswordModule
+from modules.password import PasswordModule
 from modules.wires import WiresModule
 #from modules.maze import MazeModule
 from modules.maze_rasp import MazeModule
+from modules.clocks_rasp import ClocksModule
 
 
 # =====================================================
@@ -118,30 +118,37 @@ play_button = pygame.Rect(
 
 sequence_button = pygame.Rect(
     170,
-    120,
+    100,
     300,
-    55
+    50
 )
 
 password_button = pygame.Rect(
     170,
-    190,
+    160,
     300,
-    55
+    50
 )
 
 wires_button = pygame.Rect(
     170,
-    260,
+    220,
     300,
-    55
+    50
 )
 
 maze_button = pygame.Rect(
     170,
-    330,
+    280,
     300,
-    55
+    50
+)
+
+clocks_button = pygame.Rect(
+    170,
+    340,
+    300,
+    50
 )
 
 
@@ -156,6 +163,8 @@ password_module = PasswordModule()
 wires_module = WiresModule()
 
 maze_module = MazeModule()
+
+clocks_module = ClocksModule()
 
 
 # =====================================================
@@ -288,6 +297,12 @@ while True:
 
                     game_state = "maze"
 
+                elif clocks_button.collidepoint(
+                    event.pos
+                ):
+
+                    game_state = "clocks"
+
         # ---------------------------------------------
         # SEQUÊNCIA
         # ---------------------------------------------
@@ -352,6 +367,26 @@ while True:
         elif game_state == "maze":
 
             maze_module.handle_event(
+                event
+            )
+
+            if (
+                event.type == pygame.KEYDOWN
+                and event.key == pygame.K_ESCAPE
+            ):
+
+                game_state = (
+                    "module_select"
+                )
+
+
+        # ---------------------------------------------
+        # RELOGIOS
+        # ---------------------------------------------
+
+        elif game_state == "clocks":
+
+            clocks_module.handle_event(
                 event
             )
 
@@ -436,6 +471,14 @@ while True:
             maze_module.concluido
         )
 
+
+        draw_button(
+            clocks_button,
+            "RELOGIOS",
+            module_font,
+            clocks_module.concluido
+        )
+
         instruction = (
             module_font.render(
                 "Verde = concluido",
@@ -518,6 +561,20 @@ while True:
         maze_module.update()
 
         maze_module.draw(
+            screen
+        )
+
+
+    # =================================================
+    # RELOGIOS
+    # =================================================
+
+    elif game_state == "clocks":
+
+        # Os potenciometros precisam ser lidos continuamente.
+        clocks_module.update()
+
+        clocks_module.draw(
             screen
         )
 

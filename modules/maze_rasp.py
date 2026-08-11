@@ -462,37 +462,59 @@ class MazeModule:
     # ATUALIZAR MATRIZ
     # =====================================================
 
-    def refresh_led_matrix(self):
+def refresh_led_matrix(self):
 
-        if not self.hardware_enabled:
+    if not self.hardware_enabled:
+        return
 
-            return
+    # Faz uma varredura completa das 8 colunas
 
-        for column in range(8):
+    for column in range(8):
 
-            row_data = 0
+        row_data = 0
 
-            for row in range(8):
+        for row in range(8):
 
-                if self.visited[
-                    row
-                ][
-                    column
-                ]:
+            if self.visited[
+                row
+            ][
+                column
+            ]:
 
-                    row_data |= (
-                        1 << row
-                    )
+                # =========================================
+                # CORRIGE ORIENTAÇÃO VERTICAL
+                # =========================================
+                #
+                # Linha 0 do jogo deve aparecer
+                # na parte de cima da matriz.
+                #
+                # A matriz física está invertida
+                # verticalmente, então:
+                #
+                # 0 -> 7
+                # 1 -> 6
+                # 2 -> 5
+                # ...
+                # 7 -> 0
+                #
+                # =========================================
 
-            self.display_matrix_column(
-                column,
-                row_data
-            )
+                physical_row = (
+                    7 - row
+                )
 
-            # Mesmo valor que funcionou no teste
-            time.sleep(
-                0.001
-            )
+                row_data |= (
+                    1 << physical_row
+                )
+
+        self.display_matrix_column(
+            column,
+            row_data
+        )
+
+        time.sleep(
+            0.001
+        )
 
     # =====================================================
     # APAGAR MATRIZ

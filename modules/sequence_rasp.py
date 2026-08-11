@@ -60,11 +60,20 @@ class SequenceModule:
         # =====================================================
         # GPIO DOS BOTÕES
         # =====================================================
+        #
+        # MAPEAMENTO CONFIRMADO NA PLACA
+        #
+        # Vermelho -> GPIO21
+        # Azul     -> GPIO20
+        # Verde    -> GPIO16
+        # Amarelo  -> GPIO26
+        #
+        # =====================================================
 
         self.button_pins = {
-            "vermelho": 16,
+            "vermelho": 21,
             "azul": 20,
-            "verde": 21,
+            "verde": 16,
             "amarelo": 26
         }
 
@@ -86,13 +95,18 @@ class SequenceModule:
         # =====================================================
 
         self.hardware_enabled = False
+
         self.buzzer_pwm = None
 
-        # Só permite outro botão quando o anterior
-        # tiver sido completamente solto
-        self.ready_for_button = True
+        # Guarda o último estado dos botões
+        self.previous_button_state = {
+            "vermelho": 1,
+            "azul": 1,
+            "verde": 1,
+            "amarelo": 1
+        }
 
-        # Debounce adicional
+        # Debounce
         self.last_button_time = 0
         self.debounce_time = 150
 
@@ -102,7 +116,7 @@ class SequenceModule:
         # TABELA DE SEQUÊNCIAS
         # =====================================================
         #
-        # ESQUERDA = sequência mostrada
+        # ESQUERDA = sequência tocada
         # DIREITA  = resposta correta
         #
         # =====================================================
@@ -223,11 +237,14 @@ class SequenceModule:
 
         self.generate_sequence()
 
-        # Resposta já digitada
+        # =====================================================
+        # RESPOSTA DO JOGADOR
+        # =====================================================
+
         self.player_input = []
 
         # =====================================================
-        # APRESENTAÇÃO
+        # EXIBIÇÃO
         # =====================================================
 
         self.show_index = 0
@@ -237,16 +254,19 @@ class SequenceModule:
         self.last_change_time = 0
 
         self.light_duration = 550
+
         self.pause_duration = 300
 
         self.showing_light = False
 
         # =====================================================
-        # SOM AO APERTAR BOTÃO
+        # SOM DO BOTÃO
         # =====================================================
 
         self.input_tone_active = False
+
         self.input_tone_start = 0
+
         self.input_tone_duration = 180
 
         # =====================================================
@@ -258,6 +278,7 @@ class SequenceModule:
         self.error_duration = 1000
 
         self.error_stage = 0
+
         self.error_last_change = 0
 
         # =====================================================
@@ -265,6 +286,7 @@ class SequenceModule:
         # =====================================================
 
         self.pc_sounds = {}
+
         self.pc_error_sound = None
 
         if not self.hardware_enabled:
@@ -296,7 +318,7 @@ class SequenceModule:
             except pygame.error:
 
                 print(
-                    "Nao foi possivel carregar os sons."
+                    "Nao foi possivel carregar os sons do PC."
                 )
 
         # =====================================================
@@ -330,7 +352,7 @@ class SequenceModule:
         )
 
         # =====================================================
-        # BOTÕES NA TELA
+        # BOTÕES VISUAIS
         # =====================================================
 
         self.color_buttons = {
@@ -381,7 +403,9 @@ class SequenceModule:
 
         try:
 
-            GPIO.setwarnings(False)
+            GPIO.setwarnings(
+                False
+            )
 
             GPIO.setmode(
                 GPIO.BCM
@@ -399,6 +423,12 @@ class SequenceModule:
                     pin,
                     GPIO.IN,
                     pull_up_down=GPIO.PUD_UP
+                )
+
+                self.previous_button_state[
+                    color
+                ] = GPIO.input(
+                    pin
                 )
 
             # =================================================
@@ -422,27 +452,27 @@ class SequenceModule:
             self.hardware_enabled = True
 
             print(
-                "Hardware inicializado."
+                "Hardware inicializado!"
             )
 
             print(
-                "Vermelho = GPIO16"
+                "Vermelho -> GPIO21"
             )
 
             print(
-                "Azul = GPIO20"
+                "Azul -> GPIO20"
             )
 
             print(
-                "Verde = GPIO21"
+                "Verde -> GPIO16"
             )
 
             print(
-                "Amarelo = GPIO26"
+                "Amarelo -> GPIO26"
             )
 
             print(
-                "Buzzer = GPIO4"
+                "Buzzer -> GPIO4"
             )
 
         except Exception as error:
@@ -479,6 +509,7 @@ class SequenceModule:
         )
 
         print()
+
         print(
             "=================================="
         )
@@ -571,28 +602,7 @@ class SequenceModule:
 
 
     # =====================================================
-    # VERIFICAR SE TODOS OS BOTÕES ESTÃO SOLTOS
-    # =====================================================
-
-    def all_buttons_released(self):
-
-        if not self.hardware_enabled:
-
-            return True
-
-        for pin in self.button_pins.values():
-
-            if GPIO.input(
-                pin
-            ) == GPIO.LOW:
-
-                return False
-
-        return True
-
-
-    # =====================================================
-    # LER BOTÕES DA RASPBERRY
+    # LER BOTÕES FÍSICOS
     # =====================================================
 
     def read_hardware_buttons(self):
@@ -610,18 +620,6 @@ class SequenceModule:
         )
 
         # =================================================
-        # ESPERA O BOTÃO ANTERIOR SER SOLTO
-        # =================================================
-
-        if not self.ready_for_button:
-
-            if self.all_buttons_released():
-
-                self.ready_for_button = True
-
-            return None
-
-        # =================================================
         # DEBOUNCE
         # =================================================
 
@@ -634,33 +632,73 @@ class SequenceModule:
             return None
 
         # =================================================
-        # PROCURA BOTÃO PRESSIONADO
+        # LÊ TODOS OS BOTÕES
         # =================================================
 
         for color, pin in (
             self.button_pins.items()
         ):
 
-            if GPIO.input(
+            current_state = GPIO.input(
                 pin
-            ) == GPIO.LOW:
+            )
 
-                # Bloqueia qualquer nova leitura
-                # até o botão ser solto
+            previous_state = (
+                self.previous_button_state[
+                    color
+                ]
+            )
 
-                self.ready_for_button = False
+            # Atualiza o estado
+            self.previous_button_state[
+                color
+            ] = current_state
+
+            # =================================================
+            # HIGH -> LOW
+            #
+            # botão acabou de ser pressionado
+            # =================================================
+
+            if (
+                previous_state == GPIO.HIGH
+                and current_state == GPIO.LOW
+            ):
 
                 self.last_button_time = (
                     current_time
                 )
 
                 print(
-                    f"BOTAO FISICO: {color}"
+                    f"BOTAO FISICO: "
+                    f"{color} "
+                    f"(GPIO{pin})"
                 )
 
                 return color
 
         return None
+
+
+    # =====================================================
+    # ATUALIZAR ESTADO DOS BOTÕES
+    # =====================================================
+
+    def update_button_states(self):
+
+        if not self.hardware_enabled:
+
+            return
+
+        for color, pin in (
+            self.button_pins.items()
+        ):
+
+            self.previous_button_state[
+                color
+            ] = GPIO.input(
+                pin
+            )
 
 
     # =====================================================
@@ -681,7 +719,9 @@ class SequenceModule:
 
         self.input_tone_active = False
 
-        self.ready_for_button = False
+        # Atualiza os estados para evitar leitura
+        # de botão pressionado anteriormente
+        self.update_button_states()
 
         self.last_change_time = (
             pygame.time.get_ticks()
@@ -707,10 +747,6 @@ class SequenceModule:
             self.player_input
         )
 
-        # =================================================
-        # SEGURANÇA
-        # =================================================
-
         if input_index >= len(
             self.answer_sequence
         ):
@@ -728,6 +764,7 @@ class SequenceModule:
         # =================================================
 
         print()
+
         print(
             f"POSICAO {input_index + 1}"
         )
@@ -741,7 +778,7 @@ class SequenceModule:
         )
 
         # =================================================
-        # TOCA BOTÃO
+        # SOM DO BOTÃO
         # =================================================
 
         self.stop_sound()
@@ -761,10 +798,13 @@ class SequenceModule:
         )
 
         # =================================================
-        # VERIFICA ANTES DE ADICIONAR
+        # ERRO
         # =================================================
 
-        if selected_color != expected_color:
+        if (
+            selected_color
+            != expected_color
+        ):
 
             print(
                 "RESULTADO: ERRADO"
@@ -775,7 +815,7 @@ class SequenceModule:
             return
 
         # =================================================
-        # ACERTOU ESTA POSIÇÃO
+        # CORRETO
         # =================================================
 
         print(
@@ -797,10 +837,11 @@ class SequenceModule:
         # COMPLETOU
         # =================================================
 
-        if len(
-            self.player_input
-        ) == len(
-            self.answer_sequence
+        if (
+            len(self.player_input)
+            == len(
+                self.answer_sequence
+            )
         ):
 
             self.stop_sound()
@@ -812,6 +853,7 @@ class SequenceModule:
             self.state = "completed"
 
             print()
+
             print(
                 "SEQUENCIA COMPLETA!"
             )
@@ -861,7 +903,10 @@ class SequenceModule:
 
         else:
 
-            if self.pc_error_sound is not None:
+            if (
+                self.pc_error_sound
+                is not None
+            ):
 
                 pygame.mixer.stop()
 
@@ -893,6 +938,10 @@ class SequenceModule:
 
         if self.hardware_enabled:
 
+            # -----------------------------------------
+            # PRIMEIRO TOM
+            # -----------------------------------------
+
             if (
                 self.error_stage == 0
                 and elapsed_stage >= 250
@@ -908,6 +957,10 @@ class SequenceModule:
                     current_time
                 )
 
+            # -----------------------------------------
+            # SEGUNDO TOM
+            # -----------------------------------------
+
             elif (
                 self.error_stage == 1
                 and elapsed_stage >= 250
@@ -922,6 +975,10 @@ class SequenceModule:
                 self.error_last_change = (
                     current_time
                 )
+
+            # -----------------------------------------
+            # TERCEIRO TOM
+            # -----------------------------------------
 
             elif (
                 self.error_stage == 2
@@ -939,14 +996,17 @@ class SequenceModule:
                 )
 
         # =================================================
-        # TERMINOU
+        # TERMINOU O ERRO
         # =================================================
 
-        if elapsed_total >= self.error_duration:
+        if (
+            elapsed_total
+            >= self.error_duration
+        ):
 
             self.stop_sound()
 
-            # MESMA sequência
+            # Repete a MESMA sequência
             self.start_sequence()
 
 
@@ -971,8 +1031,10 @@ class SequenceModule:
                 == pygame.MOUSEBUTTONDOWN
             ):
 
-                if self.start_button.collidepoint(
-                    event.pos
+                if (
+                    self.start_button.collidepoint(
+                        event.pos
+                    )
                 ):
 
                     self.start_sequence()
@@ -994,13 +1056,16 @@ class SequenceModule:
                 - self.last_change_time
             )
 
-            # =================================================
+            # ---------------------------------------------
             # ACENDER
-            # =================================================
+            # ---------------------------------------------
 
             if not self.showing_light:
 
-                if elapsed >= self.pause_duration:
+                if (
+                    elapsed
+                    >= self.pause_duration
+                ):
 
                     if (
                         self.show_index
@@ -1037,22 +1102,22 @@ class SequenceModule:
 
                         self.player_input = []
 
-                        # Só aceita botão depois que
-                        # TODOS estiverem soltos
-
-                        self.ready_for_button = (
-                            self.all_buttons_released()
-                        )
+                        # Atualiza estado antes de começar
+                        # a ler os botões
+                        self.update_button_states()
 
                         self.state = "input"
 
-        # =================================================
-        # APAGAR
-        # =================================================
+            # ---------------------------------------------
+            # APAGAR
+            # ---------------------------------------------
 
             else:
 
-                if elapsed >= self.light_duration:
+                if (
+                    elapsed
+                    >= self.light_duration
+                ):
 
                     self.stop_sound()
 
@@ -1082,7 +1147,8 @@ class SequenceModule:
 
             if (
                 selected_color is None
-                and event.type == pygame.KEYDOWN
+                and event.type
+                == pygame.KEYDOWN
             ):
 
                 key_map = {
@@ -1143,7 +1209,7 @@ class SequenceModule:
                 )
 
             # =================================================
-            # PARAR NOTA CURTA DO BOTÃO
+            # PARAR SOM DO BOTÃO
             # =================================================
 
             if self.input_tone_active:
@@ -1309,7 +1375,7 @@ class SequenceModule:
             )
 
         # =================================================
-        # INICIAR
+        # BOTÃO INICIAR
         # =================================================
 
         if self.state == "waiting":
@@ -1341,7 +1407,7 @@ class SequenceModule:
             )
 
         # =================================================
-        # TEXTO INFERIOR
+        # TEXTO DE ESTADO
         # =================================================
 
         if self.state == "showing":
@@ -1422,9 +1488,9 @@ class SequenceModule:
 
         self.input_tone_active = False
 
-        self.ready_for_button = True
-
         self.error_start_time = 0
+
+        self.update_button_states()
 
 
     # =====================================================
@@ -1439,7 +1505,10 @@ class SequenceModule:
 
             try:
 
-                if self.buzzer_pwm is not None:
+                if (
+                    self.buzzer_pwm
+                    is not None
+                ):
 
                     self.buzzer_pwm.stop()
 

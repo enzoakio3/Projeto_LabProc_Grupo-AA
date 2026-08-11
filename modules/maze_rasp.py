@@ -21,30 +21,38 @@ except ImportError:
     RASPBERRY_AVAILABLE = False
 
 
+# =====================================================
+# CLASSE DO LABIRINTO
+# =====================================================
+
 class MazeModule:
 
     def __init__(self):
 
-        # =====================================================
+        # =================================================
         # ESTADO
-        # =====================================================
+        # =================================================
 
         self.concluido = False
         self.state = "playing"
 
-        # =====================================================
+        # =================================================
         # LABIRINTOS
-        # =====================================================
+        # =================================================
         #
-        # 0 = caminho
+        # 0 = caminho livre
         # 1 = parede
         #
-        # =====================================================
+        # Esses mapas são usados pelo segundo jogador
+        # para orientar quem está controlando o joystick.
+        #
+        # =================================================
 
         self.mazes = [
 
             # =================================================
             # MAPA 1
+            # CIRCULO + TRIANGULO
             # =================================================
 
             {
@@ -67,6 +75,7 @@ class MazeModule:
 
             # =================================================
             # MAPA 2
+            # QUADRADO + CIRCULO
             # =================================================
 
             {
@@ -89,6 +98,7 @@ class MazeModule:
 
             # =================================================
             # MAPA 3
+            # TRIANGULO + QUADRADO
             # =================================================
 
             {
@@ -111,6 +121,7 @@ class MazeModule:
 
             # =================================================
             # MAPA 4
+            # CIRCULO + LOSANGO
             # =================================================
 
             {
@@ -132,9 +143,9 @@ class MazeModule:
             }
         ]
 
-        # =====================================================
-        # SORTEIA MAPA
-        # =====================================================
+        # =================================================
+        # ESCOLHE MAPA
+        # =================================================
 
         self.maze_index = random.randint(
             0,
@@ -143,9 +154,9 @@ class MazeModule:
 
         self.load_maze()
 
-        # =====================================================
-        # POSIÇÃO
-        # =====================================================
+        # =================================================
+        # POSIÇÃO INICIAL
+        # =================================================
 
         self.start_row = 0
         self.start_col = 0
@@ -153,12 +164,16 @@ class MazeModule:
         self.player_row = self.start_row
         self.player_col = self.start_col
 
+        # =================================================
+        # DESTINO
+        # =================================================
+
         self.goal_row = 7
         self.goal_col = 7
 
-        # =====================================================
+        # =================================================
         # CAMINHO PERCORRIDO
-        # =====================================================
+        # =================================================
 
         self.visited = [
             [
@@ -174,52 +189,53 @@ class MazeModule:
             self.player_col
         ] = True
 
-        # =====================================================
+        # =================================================
         # HARDWARE
-        # =====================================================
+        # =================================================
 
         self.hardware_enabled = False
 
-        # =====================================================
+        # =================================================
         # JOYSTICK
-        # =====================================================
+        # =================================================
 
         self.adc = None
 
         self.joystick_x_channel = 5
         self.joystick_y_channel = 6
 
-        # Centro ~128
+        # Faixa considerada centro
         self.joystick_low = 70
         self.joystick_high = 185
 
-        # Só permite um movimento por inclinação
+        # Impede repetição enquanto o joystick
+        # permanece inclinado.
         self.joystick_ready = False
 
-        # =====================================================
-        # MATRIZ 8x8
-        # =====================================================
+        # =================================================
+        # MATRIZ LED 8x8
+        # =================================================
 
         self.matrix_data_pin = 22
         self.matrix_latch_pin = 27
         self.matrix_clock_pin = 17
 
-        # =====================================================
+        # =================================================
         # ERRO
-        # =====================================================
+        # =================================================
 
         self.error_start_time = 0
         self.error_duration = 600
 
-        # =====================================================
-        # CONFIGURA HARDWARE
-        # =====================================================
+        # =================================================
+        # INICIALIZA HARDWARE
+        # =================================================
 
         self.setup_hardware()
 
-        # =====================================================
-        # VISUAL
-        # =====================================================
+        # =================================================
+        # VISUAL DO PYGAME
+        # =================================================
 
         self.cell_size = 36
 
@@ -232,6 +248,10 @@ class MazeModule:
         ) // 2
 
         self.offset_y = 145
+
+        # =================================================
+        # FONTES
+        # =================================================
 
         self.title_font = pygame.font.Font(
             None,
@@ -249,7 +269,7 @@ class MazeModule:
         )
 
     # =====================================================
-    # CARREGAR MAPA
+    # CARREGAR LABIRINTO
     # =====================================================
 
     def load_maze(self):
@@ -267,7 +287,7 @@ class MazeModule:
         ]
 
     # =====================================================
-    # HARDWARE
+    # CONFIGURAR HARDWARE
     # =====================================================
 
     def setup_hardware(self):
@@ -282,8 +302,13 @@ class MazeModule:
 
         try:
 
-            GPIO.setwarnings(False)
-            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(
+                False
+            )
+
+            GPIO.setmode(
+                GPIO.BCM
+            )
 
             # =================================================
             # MATRIZ
@@ -341,6 +366,10 @@ class MazeModule:
                 0x48
             )
 
+            # =================================================
+            # HARDWARE OK
+            # =================================================
+
             self.hardware_enabled = True
 
             print()
@@ -386,7 +415,7 @@ class MazeModule:
             self.hardware_enabled = False
 
     # =====================================================
-    # SHIFT REGISTER
+    # SHIFT OUT
     # =====================================================
 
     def shift_out(
@@ -425,7 +454,7 @@ class MazeModule:
             )
 
     # =====================================================
-    # MOSTRAR COLUNA
+    # MOSTRAR UMA COLUNA
     # =====================================================
 
     def display_matrix_column(
@@ -443,12 +472,13 @@ class MazeModule:
             GPIO.LOW
         )
 
-        # Linhas
+        # Dados das linhas
         self.shift_out(
             row_data
         )
 
-        # Coluna
+        # Seleciona a coluna.
+        # A coluna é ativa em LOW.
         self.shift_out(
             (~column_mask) & 0xFF
         )
@@ -462,59 +492,65 @@ class MazeModule:
     # ATUALIZAR MATRIZ
     # =====================================================
 
-def refresh_led_matrix(self):
+    def refresh_led_matrix(self):
 
-    if not self.hardware_enabled:
-        return
+        if not self.hardware_enabled:
+            return
 
-    # Faz uma varredura completa das 8 colunas
+        # Percorre as 8 colunas
+        for column in range(8):
 
-    for column in range(8):
+            row_data = 0
 
-        row_data = 0
+            # =============================================
+            # CONVERTE CAMINHO PARA MATRIZ
+            # =============================================
 
-        for row in range(8):
+            for row in range(8):
 
-            if self.visited[
-                row
-            ][
-                column
-            ]:
+                if self.visited[
+                    row
+                ][
+                    column
+                ]:
 
-                # =========================================
-                # CORRIGE ORIENTAÇÃO VERTICAL
-                # =========================================
-                #
-                # Linha 0 do jogo deve aparecer
-                # na parte de cima da matriz.
-                #
-                # A matriz física está invertida
-                # verticalmente, então:
-                #
-                # 0 -> 7
-                # 1 -> 6
-                # 2 -> 5
-                # ...
-                # 7 -> 0
-                #
-                # =========================================
+                    # =====================================
+                    # INVERSÃO VERTICAL
+                    # =====================================
+                    #
+                    # A matriz física está invertida
+                    # verticalmente em relação ao mapa.
+                    #
+                    # Então:
+                    #
+                    # mapa 0 -> matriz 7
+                    # mapa 1 -> matriz 6
+                    # mapa 2 -> matriz 5
+                    # ...
+                    # mapa 7 -> matriz 0
+                    #
+                    # Direita/esquerda NÃO são alteradas.
+                    #
+                    # =====================================
 
-                physical_row = (
-                    7 - row
-                )
+                    physical_row = (
+                        7 - row
+                    )
 
-                row_data |= (
-                    1 << physical_row
-                )
+                    row_data |= (
+                        1 << physical_row
+                    )
 
-        self.display_matrix_column(
-            column,
-            row_data
-        )
+            self.display_matrix_column(
+                column,
+                row_data
+            )
 
-        time.sleep(
-            0.001
-        )
+            # Mesmo intervalo que funcionou
+            # no teste isolado da matriz.
+            time.sleep(
+                0.001
+            )
 
     # =====================================================
     # APAGAR MATRIZ
@@ -523,7 +559,6 @@ def refresh_led_matrix(self):
     def clear_led_matrix(self):
 
         if not self.hardware_enabled:
-
             return
 
         GPIO.output(
@@ -545,13 +580,12 @@ def refresh_led_matrix(self):
         )
 
     # =====================================================
-    # JOYSTICK
+    # LER JOYSTICK
     # =====================================================
 
     def read_joystick(self):
 
         if not self.hardware_enabled:
-
             return None
 
         try:
@@ -574,7 +608,7 @@ def refresh_led_matrix(self):
             return None
 
         # =================================================
-        # CENTRO
+        # JOYSTICK NO CENTRO
         # =================================================
 
         centered = (
@@ -589,23 +623,29 @@ def refresh_led_matrix(self):
 
         if centered:
 
+            # Libera próximo movimento
             self.joystick_ready = True
 
             return None
 
-        # Já moveu nessa inclinação
+        # Se ainda não voltou para o centro,
+        # não aceita outro movimento.
         if not self.joystick_ready:
 
             return None
 
         # =================================================
-        # ORIENTAÇÃO CONFIRMADA NO TESTE
+        # DIREÇÕES
+        # =================================================
         #
-        # X baixo -> direita
-        # X alto  -> esquerda
+        # Orientação confirmada no teste:
         #
-        # Y baixo -> baixo
-        # Y alto  -> cima
+        # X baixo -> DIREITA
+        # X alto  -> ESQUERDA
+        #
+        # Y baixo -> BAIXO
+        # Y alto  -> CIMA
+        #
         # =================================================
 
         if x < self.joystick_low:
@@ -635,7 +675,7 @@ def refresh_led_matrix(self):
         return None
 
     # =====================================================
-    # DIREÇÃO
+    # PROCESSAR DIREÇÃO
     # =====================================================
 
     def process_direction(
@@ -677,7 +717,7 @@ def refresh_led_matrix(self):
             )
 
     # =====================================================
-    # MOVIMENTO
+    # TENTAR MOVIMENTO
     # =====================================================
 
     def try_move(
@@ -729,10 +769,18 @@ def refresh_led_matrix(self):
         # MOVIMENTO VÁLIDO
         # =================================================
 
-        self.player_row = new_row
-        self.player_col = new_col
+        self.player_row = (
+            new_row
+        )
 
-        # Marca o caminho na matriz
+        self.player_col = (
+            new_col
+        )
+
+        # =================================================
+        # MARCA CAMINHO
+        # =================================================
+
         self.visited[
             self.player_row
         ][
@@ -748,7 +796,7 @@ def refresh_led_matrix(self):
         )
 
         # =================================================
-        # CHEGOU AO DESTINO
+        # VERIFICA DESTINO
         # =================================================
 
         if (
@@ -767,13 +815,12 @@ def refresh_led_matrix(self):
             )
 
     # =====================================================
-    # ERRO
+    # ERRO / PAREDE
     # =====================================================
 
     def trigger_error(self):
 
         if self.state == "error":
-
             return
 
         print(
@@ -786,16 +833,18 @@ def refresh_led_matrix(self):
             pygame.time.get_ticks()
         )
 
-        # Obriga voltar joystick ao centro
+        # Obriga o jogador a retornar
+        # o joystick ao centro.
         self.joystick_ready = False
 
     # =====================================================
     # EVENTOS DO PYGAME
     # =====================================================
     #
-    # Aqui ficam APENAS teclado/mouse.
+    # Teclado é processado aqui.
     #
-    # Joystick NÃO vem por aqui.
+    # O joystick NÃO é processado aqui,
+    # porque ele precisa ser lido continuamente.
     #
     # =====================================================
 
@@ -805,15 +854,14 @@ def refresh_led_matrix(self):
     ):
 
         if self.concluido:
-
             return
 
         if self.state != "playing":
-
             return
 
         if event.type == pygame.KEYDOWN:
 
+            # CIMA
             if (
                 event.key == pygame.K_w
                 or event.key == pygame.K_UP
@@ -823,6 +871,7 @@ def refresh_led_matrix(self):
                     "UP"
                 )
 
+            # BAIXO
             elif (
                 event.key == pygame.K_s
                 or event.key == pygame.K_DOWN
@@ -832,6 +881,7 @@ def refresh_led_matrix(self):
                     "DOWN"
                 )
 
+            # ESQUERDA
             elif (
                 event.key == pygame.K_a
                 or event.key == pygame.K_LEFT
@@ -841,6 +891,7 @@ def refresh_led_matrix(self):
                     "LEFT"
                 )
 
+            # DIREITA
             elif (
                 event.key == pygame.K_d
                 or event.key == pygame.K_RIGHT
@@ -856,9 +907,13 @@ def refresh_led_matrix(self):
     #
     # IMPORTANTE:
     #
-    # NÃO recebe event.
+    # Esta função NÃO recebe event.
     #
-    # Deve ser chamado TODO FRAME.
+    # O main.py deve chamar:
+    #
+    # maze_module.update()
+    #
+    # a cada frame.
     #
     # =====================================================
 
@@ -871,15 +926,19 @@ def refresh_led_matrix(self):
         # =================================================
         # MATRIZ
         # =================================================
+        #
+        # Precisa ser atualizada continuamente
+        # por causa da multiplexação.
+        #
+        # =================================================
 
         self.refresh_led_matrix()
 
         # =================================================
-        # TERMINOU
+        # CONCLUÍDO
         # =================================================
 
         if self.concluido:
-
             return
 
         # =================================================
@@ -936,7 +995,7 @@ def refresh_led_matrix(self):
         )
 
     # =====================================================
-    # SÍMBOLOS
+    # DESENHAR SÍMBOLO
     # =====================================================
 
     def draw_symbol(
@@ -954,6 +1013,10 @@ def refresh_led_matrix(self):
             80
         )
 
+        # =================================================
+        # CÍRCULO
+        # =================================================
+
         if symbol == "circle":
 
             pygame.draw.circle(
@@ -963,6 +1026,10 @@ def refresh_led_matrix(self):
                 12,
                 width=3
             )
+
+        # =================================================
+        # TRIÂNGULO
+        # =================================================
 
         elif symbol == "triangle":
 
@@ -977,6 +1044,10 @@ def refresh_led_matrix(self):
                 width=3
             )
 
+        # =================================================
+        # QUADRADO
+        # =================================================
+
         elif symbol == "square":
 
             pygame.draw.rect(
@@ -990,6 +1061,10 @@ def refresh_led_matrix(self):
                 ),
                 width=3
             )
+
+        # =================================================
+        # LOSANGO
+        # =================================================
 
         elif symbol == "diamond":
 
@@ -1075,7 +1150,7 @@ def refresh_led_matrix(self):
         )
 
         # =================================================
-        # MAPA
+        # IDENTIFICAÇÃO DO MAPA
         # =================================================
 
         identifier = (
@@ -1104,7 +1179,7 @@ def refresh_led_matrix(self):
         )
 
         # =================================================
-        # POSIÇÃO / DESTINO
+        # POSIÇÃO ATUAL
         # =================================================
 
         position = (
@@ -1148,15 +1223,17 @@ def refresh_led_matrix(self):
         )
 
         # =================================================
-        # NÚMEROS
+        # NÚMEROS DAS COLUNAS
         # =================================================
 
         for col in range(8):
 
-            number = self.coord_font.render(
-                str(col + 1),
-                True,
-                (150, 150, 150)
+            number = (
+                self.coord_font.render(
+                    str(col + 1),
+                    True,
+                    (150, 150, 150)
+                )
             )
 
             x = (
@@ -1176,17 +1253,19 @@ def refresh_led_matrix(self):
             )
 
         # =================================================
-        # LETRAS
+        # LETRAS DAS LINHAS
         # =================================================
 
         for row in range(8):
 
-            letter = self.coord_font.render(
-                chr(
-                    ord("A") + row
-                ),
-                True,
-                (150, 150, 150)
+            letter = (
+                self.coord_font.render(
+                    chr(
+                        ord("A") + row
+                    ),
+                    True,
+                    (150, 150, 150)
+                )
             )
 
             y = (
@@ -1243,9 +1322,9 @@ def refresh_led_matrix(self):
                     width=1
                 )
 
-                # -----------------------------------------
+                # =========================================
                 # CAMINHO PERCORRIDO
-                # -----------------------------------------
+                # =========================================
 
                 if self.visited[
                     row
@@ -1359,7 +1438,10 @@ def refresh_led_matrix(self):
         self.concluido = False
         self.state = "playing"
 
-        # Novo mapa
+        # =================================================
+        # NOVO MAPA
+        # =================================================
+
         self.maze_index = random.randint(
             0,
             len(self.mazes) - 1
@@ -1367,7 +1449,10 @@ def refresh_led_matrix(self):
 
         self.load_maze()
 
-        # Volta ao início
+        # =================================================
+        # POSIÇÃO INICIAL
+        # =================================================
+
         self.player_row = (
             self.start_row
         )
@@ -1376,7 +1461,10 @@ def refresh_led_matrix(self):
             self.start_col
         )
 
-        # Limpa caminho
+        # =================================================
+        # LIMPA CAMINHO
+        # =================================================
+
         self.visited = [
             [
                 False
@@ -1391,7 +1479,7 @@ def refresh_led_matrix(self):
             self.player_col
         ] = True
 
-        # Precisa centralizar o joystick
+        # Exige que o joystick volte ao centro
         self.joystick_ready = False
 
     # =====================================================

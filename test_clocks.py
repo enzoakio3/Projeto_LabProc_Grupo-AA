@@ -26,6 +26,7 @@ POT_CHANNELS = [
 
 # Valores observados
 ADC_MIN = 0
+ADC_CENTER = 130
 ADC_MAX = 250
 
 
@@ -117,53 +118,75 @@ def adc_to_angle(
     value
 ):
 
-    # =================================================
-    # FAIXA DO ADC
-    # =================================================
-
     value = clamp(
         value,
         ADC_MIN,
         ADC_MAX
     )
 
-    # Normaliza:
-    #
-    # 250 -> 0.0
-    # 0   -> 1.0
-    #
-    # Está invertido porque você observou
-    # que o valor diminui ao girar.
-
-    normalized = (
-        ADC_MAX - value
-    ) / (
-        ADC_MAX - ADC_MIN
-    )
-
     # =================================================
-    # ARCO DO PONTEIRO
+    # OBJETIVO
     # =================================================
     #
-    # Começa aproximadamente em 7h30
-    # e termina aproximadamente em 4h30.
+    # ADC ~250 -> aproximadamente 7h30
+    # ADC ~130 -> 12h
+    # ADC ~0   -> aproximadamente 4h30
     #
-    # Em coordenadas matemáticas:
+    # 12h no Pygame corresponde a -90 graus.
     #
-    # 7h30  ≈ 225 graus
-    # percorre 270 graus
+    # O curso total é aproximadamente 270 graus:
+    #
+    # 135 graus para a esquerda do 12h
+    # +
+    # 135 graus para a direita do 12h
     #
     # =================================================
 
-    start_angle = 225
+    HALF_SWEEP = 135
 
-    sweep_angle = 270
+    # =================================================
+    # PARTE 1
+    #
+    # ADC 130 -> 250
+    #
+    # Centro -> extremo esquerdo
+    # =================================================
 
-    angle = (
-        start_angle
-        + normalized
-        * sweep_angle
-    )
+    if value >= ADC_CENTER:
+
+        normalized = (
+            value - ADC_CENTER
+        ) / (
+            ADC_MAX - ADC_CENTER
+        )
+
+        angle = (
+            -90
+            - normalized
+            * HALF_SWEEP
+        )
+
+    # =================================================
+    # PARTE 2
+    #
+    # ADC 130 -> 0
+    #
+    # Centro -> extremo direito
+    # =================================================
+
+    else:
+
+        normalized = (
+            ADC_CENTER - value
+        ) / (
+            ADC_CENTER - ADC_MIN
+        )
+
+        angle = (
+            -90
+            + normalized
+            * HALF_SWEEP
+        )
 
     return angle
 
@@ -184,7 +207,7 @@ def draw_clock(
     center_x, center_y = center
 
     # =================================================
-    # CÍRCULO
+    # CÍRCULO EXTERNO
     # =================================================
 
     pygame.draw.circle(
@@ -196,7 +219,7 @@ def draw_clock(
     )
 
     # =================================================
-    # MARCAS
+    # MARCAS DAS 12 HORAS
     # =================================================
 
     for hour in range(12):
@@ -265,6 +288,62 @@ def draw_clock(
         )
 
     # =================================================
+    # NÚMEROS DO RELÓGIO
+    # =================================================
+
+    for hour in range(1, 13):
+
+        # 12 fica no topo
+        hour_angle = (
+            hour * 30
+            - 90
+        )
+
+        radians = math.radians(
+            hour_angle
+        )
+
+        number_radius = (
+            radius - 25
+        )
+
+        number_x = (
+            center_x
+            + math.cos(
+                radians
+            )
+            * number_radius
+        )
+
+        number_y = (
+            center_y
+            + math.sin(
+                radians
+            )
+            * number_radius
+        )
+
+        hour_text = small_font.render(
+            str(hour),
+            True,
+            (180, 180, 180)
+        )
+
+        hour_rect = (
+            hour_text.get_rect(
+                center=(
+                    number_x,
+                    number_y
+                )
+            )
+        )
+
+        surface.blit(
+            hour_text,
+            hour_rect
+        )
+
+    # =================================================
     # PONTEIRO
     # =================================================
 
@@ -273,7 +352,7 @@ def draw_clock(
     )
 
     pointer_length = (
-        radius - 18
+        radius - 32
     )
 
     end_x = (
@@ -311,7 +390,7 @@ def draw_clock(
     )
 
     # =================================================
-    # TEXTO
+    # IDENTIFICAÇÃO DO POTENCIÔMETRO
     # =================================================
 
     title = font.render(
@@ -333,6 +412,10 @@ def draw_clock(
         title,
         title_rect
     )
+
+    # =================================================
+    # VALOR DO ADC
+    # =================================================
 
     adc_text = small_font.render(
         f"ADC: {value}",

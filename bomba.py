@@ -1,40 +1,30 @@
 import pygame
+from modulo import Modulo
 
-def draw_bomb(screen):
-    width, height = screen.get_size()
-    
-    module = pygame.image.load("module_background.png")
-    module_size = 200
-    module = pygame.transform.scale(module, (module_size,module_size))
-    
-    side_margin = (width - 3 * module_size) / 2
-    top_margin = (height - 2 * module_size) / 2
-    
-    for i in range(3):
-        for j in range(2):
-            screen.blit(module, (side_margin + i * module_size, top_margin + j * module_size))
-    
-    return
+class Bomba():
+    def __init__(self, modules, screen):
+        # Definição do tamanho da bomba a partir da tela
+        width, height = screen.get_size()
+        module_size = min((width - 2 * 100)/3,(height - 2 * 100)/2)
+        side_margin = (width - 3 * module_size) / 2
+        top_margin = (height - 2 * module_size) / 2
 
-pygame.init()
-
-screen = pygame.display.set_mode((1000,600))
-clock = pygame.time.Clock()
-
-running = True
-
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        self.modules = []
+        for module in modules:
+            self.modules.append(Modulo(module))
             
-    screen.fill((30,30,30))
-    
-    #pygame.draw.rect(screen, (200, 50, 50), (100, 100, 200, 100))
-    draw_bomb(screen)
-    
-    pygame.display.flip()
-    
-    clock.tick(60)
-pygame.quit()
+        self.size = (3 * module_size, 2 * module_size)
+        self.pos = (side_margin, top_margin)
 
+        # Ajuste do tamanho e posição dos módulos
+        for i, module in enumerate(self.modules):
+            module.image = pygame.transform.scale(module.image, (module_size,module_size))
+
+            module_pos  = (self.pos[0] + ((i % 3) * module_size), self.pos[1] + ((i // 3) * module_size))
+            module_rect = pygame.Rect(module_pos[0], module_pos[1], module_size, module_size)
+
+            module.rect = module_rect
+
+    def draw(self, screen):
+        for module in self.modules:
+            screen.blit(module.image, module.rect)

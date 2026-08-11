@@ -350,7 +350,7 @@ while True:
 
         elif game_state == "maze":
 
-            maze_module.update(
+            maze_module.handle_event(
                 event
             )
 
@@ -512,11 +512,9 @@ while True:
 
     elif game_state == "maze":
 
-        maze_module.update(
-            pygame.event.Event(
-                pygame.NOEVENT
-            )
-        )
+        # O joystick e a matriz precisam ser atualizados
+        # continuamente, mesmo quando nao existe evento Pygame.
+        maze_module.update()
 
         maze_module.draw(
             screen

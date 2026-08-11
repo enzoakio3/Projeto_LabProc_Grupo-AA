@@ -3,7 +3,8 @@ from sys import exit
 
 # from modules.sequence import SequenceModule
 from modules.sequence_rasp import SequenceModule
-from modules.password import PasswordModule
+# from modules.password import PasswordModule
+from modules.password_rasp import PasswordModule
 from modules.wires import WiresModule
 #from modules.maze import MazeModule
 from modules.maze_rasp import MazeModule

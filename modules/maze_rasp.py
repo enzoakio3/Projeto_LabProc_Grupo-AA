@@ -1,15 +1,14 @@
 import pygame
 import random
-import time
 
 
 # =====================================================
-# HARDWARE DA RASPBERRY
+# HARDWARE
 # =====================================================
 
 try:
     import RPi.GPIO as GPIO
-    from ADCDevice import ADCDevice, ADS7830
+    from hardware.ADCDevice import ADCDevice, ADS7830
 
     RASPBERRY_AVAILABLE = True
 
@@ -26,11 +25,6 @@ class MazeModule:
         # =====================================================
 
         self.concluido = False
-
-        # playing
-        # error
-        # completed
-
         self.state = "playing"
 
         # =====================================================
@@ -44,17 +38,8 @@ class MazeModule:
 
         self.mazes = [
 
-            # =================================================
-            # MAPA 1
-            # CÍRCULO + TRIÂNGULO
-            # =================================================
-
             {
-                "symbols": (
-                    "circle",
-                    "triangle"
-                ),
-
+                "symbols": ("circle", "triangle"),
                 "map": [
                     [0, 0, 0, 1, 0, 0, 0, 0],
                     [1, 1, 0, 1, 0, 1, 1, 0],
@@ -67,17 +52,8 @@ class MazeModule:
                 ]
             },
 
-            # =================================================
-            # MAPA 2
-            # QUADRADO + CÍRCULO
-            # =================================================
-
             {
-                "symbols": (
-                    "square",
-                    "circle"
-                ),
-
+                "symbols": ("square", "circle"),
                 "map": [
                     [0, 0, 0, 0, 0, 1, 0, 0],
                     [1, 1, 1, 1, 0, 1, 0, 1],
@@ -90,17 +66,8 @@ class MazeModule:
                 ]
             },
 
-            # =================================================
-            # MAPA 3
-            # TRIÂNGULO + QUADRADO
-            # =================================================
-
             {
-                "symbols": (
-                    "triangle",
-                    "square"
-                ),
-
+                "symbols": ("triangle", "square"),
                 "map": [
                     [0, 1, 0, 0, 0, 0, 0, 0],
                     [0, 1, 0, 1, 1, 1, 1, 0],
@@ -113,17 +80,8 @@ class MazeModule:
                 ]
             },
 
-            # =================================================
-            # MAPA 4
-            # CÍRCULO + LOSANGO
-            # =================================================
-
             {
-                "symbols": (
-                    "circle",
-                    "diamond"
-                ),
-
+                "symbols": ("circle", "diamond"),
                 "map": [
                     [0, 0, 0, 0, 1, 0, 0, 0],
                     [1, 1, 1, 0, 1, 0, 1, 0],
@@ -137,10 +95,6 @@ class MazeModule:
             }
         ]
 
-        # =====================================================
-        # SORTEIA MAPA
-        # =====================================================
-
         self.maze_index = random.randint(
             0,
             len(self.mazes) - 1
@@ -149,7 +103,7 @@ class MazeModule:
         self.load_maze()
 
         # =====================================================
-        # INÍCIO
+        # POSIÇÕES
         # =====================================================
 
         self.start_row = 0
@@ -157,10 +111,6 @@ class MazeModule:
 
         self.player_row = self.start_row
         self.player_col = self.start_col
-
-        # =====================================================
-        # DESTINO
-        # =====================================================
 
         self.goal_row = 7
         self.goal_col = 7
@@ -170,10 +120,7 @@ class MazeModule:
         # =====================================================
 
         self.visited = [
-            [
-                False
-                for _ in range(8)
-            ]
+            [False for _ in range(8)]
             for _ in range(8)
         ]
 
@@ -184,46 +131,29 @@ class MazeModule:
         ] = True
 
         # =====================================================
-        # HARDWARE
-        # =====================================================
-
-        self.hardware_enabled = False
-
-        # ADC do joystick
-        self.adc = None
-
-        # =====================================================
         # JOYSTICK
         # =====================================================
-        #
-        # Freenove:
-        #
-        # X = ADS7830 canal 5
-        # Y = ADS7830 canal 6
-        #
-        # =====================================================
+
+        self.adc = None
 
         self.joystick_x_channel = 5
         self.joystick_y_channel = 6
 
-        # Valor normalmente fica perto do meio
-        # quando joystick está parado.
+        # ADS7830 -> 0 a 255
+        self.joystick_low = 70
+        self.joystick_high = 185
 
-        self.joystick_low_threshold = 70
-        self.joystick_high_threshold = 185
-
-        # Só faz um movimento por deslocamento
+        # Só permite um movimento por inclinação
         self.joystick_ready = True
 
         # =====================================================
-        # MATRIZ LED
+        # LED MATRIX
         # =====================================================
         #
         # Freenove:
-        #
-        # DATA  -> GPIO22
-        # LATCH -> GPIO27
-        # CLOCK -> GPIO17
+        # DATA  = GPIO22
+        # LATCH = GPIO27
+        # CLOCK = GPIO17
         #
         # =====================================================
 
@@ -231,28 +161,28 @@ class MazeModule:
         self.matrix_latch_pin = 27
         self.matrix_clock_pin = 17
 
-        # Qual coluna será atualizada neste frame
         self.matrix_scan_column = 0
 
         # =====================================================
-        # BUZZER DE ERRO
+        # BUZZER
         # =====================================================
 
         self.buzzer_pin = 4
-
         self.buzzer_pwm = None
 
         self.error_start_time = 0
         self.error_duration = 700
 
         # =====================================================
-        # CONFIGURA HARDWARE
+        # HARDWARE
         # =====================================================
+
+        self.hardware_enabled = False
 
         self.setup_hardware()
 
         # =====================================================
-        # TELA
+        # VISUAL PYGAME
         # =====================================================
 
         self.cell_size = 36
@@ -266,10 +196,6 @@ class MazeModule:
         ) // 2
 
         self.offset_y = 145
-
-        # =====================================================
-        # FONTES
-        # =====================================================
 
         self.title_font = pygame.font.Font(
             None,
@@ -286,18 +212,15 @@ class MazeModule:
             22
         )
 
-
     # =====================================================
-    # CARREGAR MAPA
+    # CARREGAR LABIRINTO
     # =====================================================
 
     def load_maze(self):
 
-        maze_data = (
-            self.mazes[
-                self.maze_index
-            ]
-        )
+        maze_data = self.mazes[
+            self.maze_index
+        ]
 
         self.maze = maze_data[
             "map"
@@ -307,9 +230,8 @@ class MazeModule:
             "symbols"
         ]
 
-
     # =====================================================
-    # CONFIGURAR HARDWARE
+    # HARDWARE
     # =====================================================
 
     def setup_hardware(self):
@@ -317,28 +239,19 @@ class MazeModule:
         if not RASPBERRY_AVAILABLE:
 
             print(
-                "Maze executando em modo PC."
+                "Maze em modo PC."
             )
 
             return
 
         try:
 
-            # =================================================
-            # GPIO
-            # =================================================
+            GPIO.setwarnings(False)
+            GPIO.setmode(GPIO.BCM)
 
-            GPIO.setwarnings(
-                False
-            )
-
-            GPIO.setmode(
-                GPIO.BCM
-            )
-
-            # =================================================
+            # ---------------------------------------------
             # MATRIZ
-            # =================================================
+            # ---------------------------------------------
 
             GPIO.setup(
                 self.matrix_data_pin,
@@ -355,24 +268,9 @@ class MazeModule:
                 GPIO.OUT
             )
 
-            GPIO.output(
-                self.matrix_data_pin,
-                GPIO.LOW
-            )
-
-            GPIO.output(
-                self.matrix_latch_pin,
-                GPIO.LOW
-            )
-
-            GPIO.output(
-                self.matrix_clock_pin,
-                GPIO.LOW
-            )
-
-            # =================================================
+            # ---------------------------------------------
             # BUZZER
-            # =================================================
+            # ---------------------------------------------
 
             GPIO.setup(
                 self.buzzer_pin,
@@ -388,15 +286,15 @@ class MazeModule:
                 0
             )
 
-            # =================================================
-            # ADC
-            # =================================================
+            # ---------------------------------------------
+            # ADC / JOYSTICK
+            # ---------------------------------------------
 
-            self.adc = ADCDevice(
+            test_adc = ADCDevice(
                 0x48
             )
 
-            if self.adc.detectI2C(
+            if test_adc.detectI2C(
                 0x48
             ):
 
@@ -414,29 +312,25 @@ class MazeModule:
                     "ADS7830 nao encontrado."
                 )
 
-                print(
-                    "Execute: i2cdetect -y 1"
-                )
-
                 return
 
             self.hardware_enabled = True
 
             print()
             print(
-                "Hardware do labirinto inicializado!"
+                "Hardware do labirinto OK!"
             )
 
             print(
-                "Joystick X -> ADC canal 5"
+                "Joystick X -> canal 5"
             )
 
             print(
-                "Joystick Y -> ADC canal 6"
+                "Joystick Y -> canal 6"
             )
 
             print(
-                "Matrix DATA  -> GPIO22"
+                "Matrix DATA -> GPIO22"
             )
 
             print(
@@ -452,7 +346,7 @@ class MazeModule:
         except Exception as error:
 
             print(
-                "Erro ao inicializar hardware do maze:"
+                "Erro no hardware do maze:"
             )
 
             print(
@@ -460,7 +354,6 @@ class MazeModule:
             )
 
             self.hardware_enabled = False
-
 
     # =====================================================
     # SHIFT OUT
@@ -471,22 +364,21 @@ class MazeModule:
         value
     ):
 
-        for i in range(8):
+        for bit in range(8):
 
             GPIO.output(
                 self.matrix_clock_pin,
                 GPIO.LOW
             )
 
-            bit = (
-                value
-                & (0x80 >> i)
+            mask = (
+                0x80 >> bit
             )
 
             GPIO.output(
                 self.matrix_data_pin,
                 GPIO.HIGH
-                if bit
+                if value & mask
                 else GPIO.LOW
             )
 
@@ -495,9 +387,8 @@ class MazeModule:
                 GPIO.HIGH
             )
 
-
     # =====================================================
-    # ATUALIZAR MATRIZ LED
+    # MATRIZ LED
     # =====================================================
 
     def update_led_matrix(self):
@@ -506,14 +397,11 @@ class MazeModule:
 
             return
 
-        # =================================================
-        # CONSTRÓI OS 8 BITS DE UMA COLUNA
-        # =================================================
-
         col = self.matrix_scan_column
 
         row_data = 0
 
+        # Monta os bits da coluna atual
         for row in range(8):
 
             if self.visited[
@@ -526,31 +414,20 @@ class MazeModule:
                     1 << row
                 )
 
-        # =================================================
-        # SELECIONA COLUNA
-        # =================================================
-
         column_mask = (
             0x80 >> col
         )
-
-        # =================================================
-        # ENVIA PARA OS DOIS 74HC595
-        # =================================================
 
         GPIO.output(
             self.matrix_latch_pin,
             GPIO.LOW
         )
 
-        # Dados dos LEDs
         self.shift_out(
             row_data
         )
 
-        # Seleção de coluna.
-        # A matriz da Freenove utiliza seleção invertida.
-
+        # seleção de coluna ativa em LOW
         self.shift_out(
             (~column_mask) & 0xFF
         )
@@ -560,17 +437,17 @@ class MazeModule:
             GPIO.HIGH
         )
 
-        # Próxima coluna
-
         self.matrix_scan_column += 1
 
-        if self.matrix_scan_column >= 8:
+        if (
+            self.matrix_scan_column
+            >= 8
+        ):
 
             self.matrix_scan_column = 0
 
-
     # =====================================================
-    # LER JOYSTICK
+    # JOYSTICK
     # =====================================================
 
     def read_joystick(self):
@@ -589,63 +466,75 @@ class MazeModule:
                 self.joystick_y_channel
             )
 
-        except Exception:
+        except Exception as error:
+
+            print(
+                "Erro joystick:",
+                error
+            )
 
             return None
 
-        # =================================================
-        # JOYSTICK CENTRALIZADO
-        # =================================================
+        # DEBUG
+        # pode remover depois
+        # print("X:", x, "Y:", y)
+
+        # ---------------------------------------------
+        # CENTRO
+        # ---------------------------------------------
 
         centered = (
-            self.joystick_low_threshold
-            <= x
-            <= self.joystick_high_threshold
+            self.joystick_low <= x <= self.joystick_high
             and
-            self.joystick_low_threshold
-            <= y
-            <= self.joystick_high_threshold
+            self.joystick_low <= y <= self.joystick_high
         )
 
         if centered:
 
-            # Agora pode aceitar outro movimento
             self.joystick_ready = True
 
             return None
 
-        # Já fez um movimento com essa inclinada
+        # Já moveu nessa inclinação
         if not self.joystick_ready:
 
             return None
 
-        # =================================================
-        # MOVIMENTO HORIZONTAL
-        # =================================================
+        # ---------------------------------------------
+        # HORIZONTAL
+        # ---------------------------------------------
 
-        if x < self.joystick_low_threshold:
+        if (
+            x < self.joystick_low
+        ):
 
             self.joystick_ready = False
 
             return "LEFT"
 
-        if x > self.joystick_high_threshold:
+        if (
+            x > self.joystick_high
+        ):
 
             self.joystick_ready = False
 
             return "RIGHT"
 
-        # =================================================
-        # MOVIMENTO VERTICAL
-        # =================================================
+        # ---------------------------------------------
+        # VERTICAL
+        # ---------------------------------------------
 
-        if y < self.joystick_low_threshold:
+        if (
+            y < self.joystick_low
+        ):
 
             self.joystick_ready = False
 
             return "UP"
 
-        if y > self.joystick_high_threshold:
+        if (
+            y > self.joystick_high
+        ):
 
             self.joystick_ready = False
 
@@ -653,15 +542,19 @@ class MazeModule:
 
         return None
 
-
     # =====================================================
-    # PROCESSAR DIREÇÃO
+    # DIREÇÃO
     # =====================================================
 
     def process_direction(
         self,
         direction
     ):
+
+        print(
+            "Direcao:",
+            direction
+        )
 
         if direction == "UP":
 
@@ -691,9 +584,8 @@ class MazeModule:
                 1
             )
 
-
     # =====================================================
-    # TENTAR MOVIMENTO
+    # MOVIMENTO
     # =====================================================
 
     def try_move(
@@ -712,9 +604,9 @@ class MazeModule:
             + col_change
         )
 
-        # =================================================
+        # ---------------------------------------------
         # FORA DO MAPA
-        # =================================================
+        # ---------------------------------------------
 
         if (
             new_row < 0
@@ -727,9 +619,9 @@ class MazeModule:
 
             return
 
-        # =================================================
+        # ---------------------------------------------
         # PAREDE
-        # =================================================
+        # ---------------------------------------------
 
         if self.maze[
             new_row
@@ -741,14 +633,13 @@ class MazeModule:
 
             return
 
-        # =================================================
+        # ---------------------------------------------
         # MOVIMENTO VÁLIDO
-        # =================================================
+        # ---------------------------------------------
 
         self.player_row = new_row
         self.player_col = new_col
 
-        # Marca caminho
         self.visited[
             self.player_row
         ][
@@ -763,24 +654,24 @@ class MazeModule:
             )
         )
 
-        # =================================================
-        # DESTINO
-        # =================================================
+        # ---------------------------------------------
+        # OBJETIVO
+        # ---------------------------------------------
 
         if (
-            self.player_row == self.goal_row
+            self.player_row
+            == self.goal_row
             and
-            self.player_col == self.goal_col
+            self.player_col
+            == self.goal_col
         ):
 
             self.concluido = True
-
             self.state = "completed"
 
             print(
                 "Labirinto concluido!"
             )
-
 
     # =====================================================
     # ERRO
@@ -802,10 +693,6 @@ class MazeModule:
             pygame.time.get_ticks()
         )
 
-        # =================================================
-        # BUZZER
-        # =================================================
-
         if (
             self.hardware_enabled
             and self.buzzer_pwm
@@ -820,9 +707,8 @@ class MazeModule:
                 50
             )
 
-
     # =====================================================
-    # PARAR BUZZER
+    # BUZZER
     # =====================================================
 
     def stop_buzzer(self):
@@ -843,7 +729,6 @@ class MazeModule:
 
                 pass
 
-
     # =====================================================
     # COORDENADA
     # =====================================================
@@ -862,7 +747,6 @@ class MazeModule:
             f"{letter}{col + 1}"
         )
 
-
     # =====================================================
     # UPDATE
     # =====================================================
@@ -877,23 +761,18 @@ class MazeModule:
         )
 
         # =================================================
-        # MATRIZ
-        # =================================================
-        #
-        # Precisa ser atualizada continuamente.
+        # REFRESH MATRIZ
         # =================================================
 
         if self.hardware_enabled:
 
-            # Fazemos todas as 8 colunas por update
-            # para aumentar a taxa de atualização.
-
-            for _ in range(8):
+            # várias varreduras por frame
+            for _ in range(16):
 
                 self.update_led_matrix()
 
         # =================================================
-        # CONCLUÍDO
+        # COMPLETOU
         # =================================================
 
         if self.concluido:
@@ -916,9 +795,7 @@ class MazeModule:
 
                 self.state = "playing"
 
-                # Exige joystick centralizado
-                # antes de andar novamente.
-
+                # precisa voltar ao centro
                 self.joystick_ready = False
 
             return
@@ -932,11 +809,6 @@ class MazeModule:
         )
 
         if direction is not None:
-
-            print(
-                "Joystick:",
-                direction
-            )
 
             self.process_direction(
                 direction
@@ -985,7 +857,6 @@ class MazeModule:
                 self.process_direction(
                     "RIGHT"
                 )
-
 
     # =====================================================
     # DESENHAR SÍMBOLO
@@ -1057,7 +928,6 @@ class MazeModule:
                 width=3
             )
 
-
     # =====================================================
     # DRAW
     # =====================================================
@@ -1117,32 +987,25 @@ class MazeModule:
             title_color
         )
 
-        title_rect = title.get_rect(
-            center=(
-                320,
-                30
-            )
-        )
-
         screen.blit(
             title,
-            title_rect
-        )
-
-        # =================================================
-        # IDENTIFICADORES
-        # =================================================
-
-        identifier = (
-            self.info_font.render(
-                "MAPA:",
-                True,
-                (180, 180, 180)
+            title.get_rect(
+                center=(320, 30)
             )
         )
 
+        # =================================================
+        # MAPA
+        # =================================================
+
+        map_text = self.info_font.render(
+            "MAPA:",
+            True,
+            (180, 180, 180)
+        )
+
         screen.blit(
-            identifier,
+            map_text,
             (235, 62)
         )
 
@@ -1172,20 +1035,16 @@ class MazeModule:
             self.goal_col
         )
 
-        position_text = (
-            self.info_font.render(
-                f"POSICAO: {position}",
-                True,
-                (255, 210, 80)
-            )
+        position_text = self.info_font.render(
+            f"POSICAO: {position}",
+            True,
+            (255, 210, 80)
         )
 
-        destination_text = (
-            self.info_font.render(
-                f"DESTINO: {destination}",
-                True,
-                (80, 220, 100)
-            )
+        destination_text = self.info_font.render(
+            f"DESTINO: {destination}",
+            True,
+            (80, 220, 100)
         )
 
         screen.blit(
@@ -1204,7 +1063,7 @@ class MazeModule:
 
         for col in range(8):
 
-            number = self.coord_font.render(
+            text = self.coord_font.render(
                 str(col + 1),
                 True,
                 (150, 150, 150)
@@ -1217,8 +1076,8 @@ class MazeModule:
             )
 
             screen.blit(
-                number,
-                number.get_rect(
+                text,
+                text.get_rect(
                     center=(
                         x,
                         self.offset_y - 12
@@ -1228,7 +1087,7 @@ class MazeModule:
 
         for row in range(8):
 
-            letter = self.coord_font.render(
+            text = self.coord_font.render(
                 chr(
                     ord("A") + row
                 ),
@@ -1243,8 +1102,8 @@ class MazeModule:
             )
 
             screen.blit(
-                letter,
-                letter.get_rect(
+                text,
+                text.get_rect(
                     center=(
                         self.offset_x - 15,
                         y
@@ -1254,9 +1113,6 @@ class MazeModule:
 
         # =================================================
         # GRADE
-        # =================================================
-        #
-        # Paredes NÃO aparecem.
         # =================================================
 
         for row in range(8):
@@ -1292,10 +1148,6 @@ class MazeModule:
                     cell,
                     width=1
                 )
-
-                # =========================================
-                # CAMINHO VISITADO
-                # =========================================
 
                 if self.visited[
                     row
@@ -1372,18 +1224,18 @@ class MazeModule:
 
         if self.hardware_enabled:
 
-            instruction = (
-                "Joystick: mover | Matriz: caminho"
+            info = (
+                "Joystick para mover | Matriz = caminho"
             )
 
         else:
 
-            instruction = (
+            info = (
                 "WASD / setas para mover"
             )
 
         text = self.info_font.render(
-            instruction,
+            info,
             True,
             (150, 150, 150)
         )
@@ -1391,13 +1243,9 @@ class MazeModule:
         screen.blit(
             text,
             text.get_rect(
-                center=(
-                    320,
-                    455
-                )
+                center=(320, 455)
             )
         )
-
 
     # =====================================================
     # RESET
@@ -1408,10 +1256,8 @@ class MazeModule:
         self.stop_buzzer()
 
         self.concluido = False
-
         self.state = "playing"
 
-        # Novo mapa
         self.maze_index = random.randint(
             0,
             len(self.mazes) - 1
@@ -1419,20 +1265,11 @@ class MazeModule:
 
         self.load_maze()
 
-        self.player_row = (
-            self.start_row
-        )
+        self.player_row = self.start_row
+        self.player_col = self.start_col
 
-        self.player_col = (
-            self.start_col
-        )
-
-        # Limpa matriz
         self.visited = [
-            [
-                False
-                for _ in range(8)
-            ]
+            [False for _ in range(8)]
             for _ in range(8)
         ]
 
@@ -1443,7 +1280,6 @@ class MazeModule:
         ] = True
 
         self.joystick_ready = False
-
 
     # =====================================================
     # LIMPAR MATRIZ
@@ -1465,14 +1301,13 @@ class MazeModule:
         )
 
         self.shift_out(
-            0x00
+            0xFF
         )
 
         GPIO.output(
             self.matrix_latch_pin,
             GPIO.HIGH
         )
-
 
     # =====================================================
     # CLEANUP

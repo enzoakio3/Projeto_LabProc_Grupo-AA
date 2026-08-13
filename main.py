@@ -3,12 +3,12 @@ from sys import exit
 
 # from modules.sequence import SequenceModule
 from modules.sequence_rasp import SequenceModule
-# from modules.password import PasswordModule
-from modules.password_rasp import PasswordModule
+from modules.password import PasswordModule
 from modules.wires import WiresModule
 #from modules.maze import MazeModule
 from modules.maze_rasp import MazeModule
 from modules.clocks_rasp import ClocksModule
+from modules.game_timer import GameTimer
 
 
 # =====================================================
@@ -98,6 +98,12 @@ GREEN = (
     80
 )
 
+RED = (
+    220,
+    60,
+    60
+)
+
 
 # =====================================================
 # ESTADO
@@ -114,6 +120,14 @@ play_button = pygame.Rect(
     220,
     300,
     200,
+    60
+)
+
+
+retry_button = pygame.Rect(
+    190,
+    290,
+    260,
     60
 )
 
@@ -166,6 +180,10 @@ wires_module = WiresModule()
 maze_module = MazeModule()
 
 clocks_module = ClocksModule()
+
+game_timer = GameTimer(
+    duration_seconds=5 * 60
+)
 
 
 # =====================================================
@@ -222,6 +240,112 @@ def draw_button(
     )
 
 
+
+# =====================================================
+# CONTROLE GLOBAL DO JOGO
+# =====================================================
+
+def all_modules_completed():
+
+    return (
+        sequence_module.concluido
+        and password_module.concluido
+        and wires_module.concluido
+        and maze_module.concluido
+        and clocks_module.concluido
+    )
+
+
+def reset_game():
+
+    sequence_module.reset()
+    password_module.reset()
+    wires_module.reset()
+    maze_module.reset()
+    clocks_module.reset()
+
+    game_timer.reset()
+    game_timer.start()
+
+
+def cleanup_game():
+
+    try:
+        game_timer.cleanup()
+    except Exception:
+        pass
+
+    for module in [
+        sequence_module,
+        password_module,
+        wires_module,
+        maze_module,
+        clocks_module
+    ]:
+
+        try:
+
+            if hasattr(
+                module,
+                "cleanup"
+            ):
+
+                module.cleanup()
+
+        except Exception:
+            pass
+
+
+def draw_center_message(
+    title_text,
+    subtitle_text,
+    title_color
+):
+
+    screen.fill(
+        (20, 20, 20)
+    )
+
+    title = title_font.render(
+        title_text,
+        True,
+        title_color
+    )
+
+    screen.blit(
+        title,
+        title.get_rect(
+            center=(320, 180)
+        )
+    )
+
+    subtitle = module_font.render(
+        subtitle_text,
+        True,
+        WHITE
+    )
+
+    screen.blit(
+        subtitle,
+        subtitle.get_rect(
+            center=(320, 240)
+        )
+    )
+
+    instruction = module_font.render(
+        "ESC para voltar ao menu",
+        True,
+        (150, 150, 150)
+    )
+
+    screen.blit(
+        instruction,
+        instruction.get_rect(
+            center=(320, 390)
+        )
+    )
+
+
 # =====================================================
 # LOOP PRINCIPAL
 # =====================================================
@@ -239,6 +363,8 @@ while True:
         # ---------------------------------------------
 
         if event.type == pygame.QUIT:
+
+            cleanup_game()
 
             pygame.quit()
 
@@ -258,6 +384,8 @@ while True:
                 if play_button.collidepoint(
                     event.pos
                 ):
+
+                    reset_game()
 
                     game_state = (
                         "module_select"
@@ -401,6 +529,84 @@ while True:
                 )
 
 
+        # ---------------------------------------------
+        # VITORIA / DERROTA
+        # ---------------------------------------------
+
+        elif (
+            game_state == "victory"
+            or game_state == "game_over"
+        ):
+
+            # TENTAR NOVAMENTE
+            if (
+                event.type
+                == pygame.MOUSEBUTTONDOWN
+                and retry_button.collidepoint(
+                    event.pos
+                )
+            ):
+
+                reset_game()
+
+                game_state = "module_select"
+
+            # VOLTAR AO MENU
+            elif (
+                event.type == pygame.KEYDOWN
+                and event.key == pygame.K_ESCAPE
+            ):
+
+                game_timer.reset()
+
+                game_state = "menu"
+
+
+
+    # =================================================
+    # CRONOMETRO GLOBAL
+    # =================================================
+
+    if game_state not in [
+        "menu",
+        "victory",
+        "game_over"
+    ]:
+
+        game_timer.update()
+
+        # Primeiro verifica se o jogador terminou tudo.
+        if all_modules_completed():
+
+            game_timer.stop()
+
+            game_state = "victory"
+
+        # Se o tempo acabou antes de concluir os 5 modulos.
+        elif game_timer.is_expired():
+
+            game_state = "game_over"
+
+    # =================================================
+    # DISPLAY FISICO DO CRONOMETRO
+    # =================================================
+    #
+    # A matriz do labirinto e o display de 7 segmentos
+    # usam GPIO22, GPIO27 e GPIO17.
+    #
+    # Durante o Maze, a matriz recebe prioridade e o
+    # cronometro continua contando internamente.
+    #
+    # =================================================
+
+    if game_state not in [
+        "menu",
+        "maze"
+    ]:
+
+        game_timer.refresh_display()
+
+
     # =================================================
     # MENU
     # =================================================
@@ -490,13 +696,26 @@ while True:
 
         instruction_rect = (
             instruction.get_rect(
-                center=(320, 430)
+                center=(320, 455)
             )
         )
 
         screen.blit(
             instruction,
             instruction_rect
+        )
+
+        timer_text = module_font.render(
+            f"TEMPO: {game_timer.get_text()}",
+            True,
+            WHITE
+        )
+
+        screen.blit(
+            timer_text,
+            timer_text.get_rect(
+                center=(320, 420)
+            )
         )
 
 
@@ -577,6 +796,48 @@ while True:
 
         clocks_module.draw(
             screen
+        )
+
+
+
+    # =================================================
+    # VITORIA
+    # =================================================
+
+    elif game_state == "victory":
+
+        draw_center_message(
+            "VOCES VENCERAM!",
+            (
+                "Todos os 5 modulos foram concluidos "
+                f"com {game_timer.get_text()} restantes"
+            ),
+            GREEN
+        )
+
+        draw_button(
+            retry_button,
+            "TENTAR NOVAMENTE",
+            module_font
+        )
+
+
+    # =================================================
+    # DERROTA
+    # =================================================
+
+    elif game_state == "game_over":
+
+        draw_center_message(
+            "VOCE PERDEU!",
+            "O tempo de 5 minutos acabou",
+            RED
+        )
+
+        draw_button(
+            retry_button,
+            "TENTAR NOVAMENTE",
+            module_font
         )
 
 

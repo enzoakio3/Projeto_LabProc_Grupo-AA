@@ -85,8 +85,6 @@ class PasswordModule:
         self.keypad = None
         self.hardware_enabled = False
 
-        self.setup_keypad()
-
         # =====================================================
         # FONTES
         # =====================================================
@@ -205,6 +203,22 @@ class PasswordModule:
 
             self.keypad = None
             self.hardware_enabled = False
+
+    # =====================================================
+    # ATIVAR / DESATIVAR HARDWARE
+    # =====================================================
+
+    def activate(self):
+        """Configura o keypad somente quando o modulo de senha e aberto."""
+        if self.hardware_enabled and self.keypad is not None:
+            return
+
+        self.setup_keypad()
+
+    def deactivate(self):
+        """Libera a referencia do keypad para outro modulo usar os GPIOs."""
+        self.keypad = None
+        self.hardware_enabled = False
 
     # =====================================================
     # PROCESSAR UMA TECLA

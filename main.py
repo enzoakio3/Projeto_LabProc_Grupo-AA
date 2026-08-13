@@ -246,6 +246,18 @@ def draw_button(
 # CONTROLE GLOBAL DO JOGO
 # =====================================================
 
+def activate_sequence_hardware():
+    # O keypad e os botoes da sequencia compartilham GPIOs.
+    password_module.deactivate()
+    sequence_module.activate()
+
+
+def activate_password_hardware():
+    # Libera os botoes da sequencia antes de configurar o keypad.
+    sequence_module.deactivate()
+    password_module.activate()
+
+
 def all_modules_completed():
 
     return (
@@ -258,6 +270,9 @@ def all_modules_completed():
 
 
 def reset_game():
+
+    sequence_module.deactivate()
+    password_module.deactivate()
 
     sequence_module.reset()
     password_module.reset()
@@ -407,12 +422,14 @@ while True:
                     event.pos
                 ):
 
+                    activate_sequence_hardware()
                     game_state = "sequence"
 
                 elif password_button.collidepoint(
                     event.pos
                 ):
 
+                    activate_password_hardware()
                     game_state = "password"
 
                 elif wires_button.collidepoint(
@@ -448,6 +465,8 @@ while True:
                 and event.key == pygame.K_ESCAPE
             ):
 
+                sequence_module.deactivate()
+
                 game_state = (
                     "module_select"
                 )
@@ -466,6 +485,8 @@ while True:
                 event.type == pygame.KEYDOWN
                 and event.key == pygame.K_ESCAPE
             ):
+
+                password_module.deactivate()
 
                 game_state = (
                     "module_select"

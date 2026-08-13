@@ -133,7 +133,9 @@ class SequenceModule:
         # Todos precisam continuar soltos por 70 ms
         self.release_confirm_time = 70
 
-        self.setup_hardware()
+        # O hardware e ativado somente ao entrar neste modulo.
+        # Isso evita conflito com o keypad, que compartilha
+        # GPIO16, GPIO20, GPIO21 e GPIO26.
 
         # =====================================================
         # TABELA DE SEQUÊNCIAS
@@ -482,6 +484,45 @@ class SequenceModule:
 
             self.hardware_enabled = False
 
+
+    # =====================================================
+    # ATIVAR / DESATIVAR HARDWARE
+    # =====================================================
+
+    def activate(self):
+        """Configura botoes e buzzer somente ao entrar no modulo."""
+        if self.hardware_enabled:
+            return
+
+        self.setup_hardware()
+        self.reset_button_reader()
+
+    def deactivate(self):
+        """Para o buzzer e libera logicamente o hardware compartilhado."""
+        self.stop_sound()
+
+        if RASPBERRY_AVAILABLE:
+            try:
+                # Libera apenas os GPIOs compartilhados com o keypad.
+                for pin in self.button_pins.values():
+                    GPIO.cleanup(pin)
+
+                # O buzzer nao e compartilhado, mas encerramos o PWM
+                # para que uma futura ativacao possa cria-lo novamente.
+                if self.buzzer_pwm is not None:
+                    try:
+                        self.buzzer_pwm.stop()
+                    except Exception:
+                        pass
+
+                GPIO.cleanup(self.buzzer_pin)
+
+            except Exception as error:
+                print("Erro ao liberar hardware da sequencia:", error)
+
+        self.buzzer_pwm = None
+        self.hardware_enabled = False
+        self.reset_button_reader()
 
     # =====================================================
     # GERAR SEQUÊNCIA

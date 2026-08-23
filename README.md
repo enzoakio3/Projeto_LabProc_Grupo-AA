@@ -59,6 +59,7 @@ Os principais periféricos previstos para o projeto são:
 - **Buzzer:** feedback sonoro para início da partida, erros, vitória e derrota.
 - **Potenciômetro:** utilizado em um dos desafios que exige ajuste de um valor específico.
 - **Teclado matricial (Keypad):** utilizado em um dos desafios.
+- **Matriz de leds:** feedback para jogador em um dos jogos.
 
 ---
 

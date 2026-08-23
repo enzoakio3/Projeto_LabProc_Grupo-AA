@@ -1,5 +1,5 @@
 # Projeto_LabProc_Grupo-AA
-O **\<nome do projeto\>** é um jogo implementado em uma **Raspberry Pi 3**, inspirado em **Keep Talking and Nobody Explodes**.
+O nosso projeto é um jogo implementado em uma **Raspberry Pi 3**, inspirado em **Keep Talking and Nobody Explodes**.
 
 O jogo foi projetado para ser jogado por duas ou mais pessoas. Um dos jogadores assume o papel de **desarmador** da bomba, enquanto os demais atuam como **especialistas**, consultando o manual de desarmamento para fornecer as instruções necessárias.
 

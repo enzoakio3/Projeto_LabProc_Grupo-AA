@@ -58,7 +58,6 @@ Os principais periféricos previstos para o projeto são:
 - **LEDs:** indicação visual do estado dos módulos (ativo, concluído ou erro).
 - **Buzzer:** feedback sonoro para início da partida, erros, vitória e derrota.
 - **Potenciômetro:** utilizado em um dos desafios que exige ajuste de um valor específico.
-- **Sensor ultrassônico (opcional):** utilizado em desafios baseados na distância entre o jogador e o sensor.
 - **Teclado matricial (Keypad):** utilizado em um dos desafios.
 
 ---
